@@ -1,12 +1,16 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
+import Toast from 'react-native-toast-message';
+import AppNavigator from './navigation/AppNavigator';
+import { colors } from './utils/colors';
 
-const App = () => {
+export default function App() {
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Tunja Gastro AI</Text>
-    </View>
+    <NavigationContainer>
+      <StatusBar style="dark" backgroundColor={colors.background} />
+      <AppNavigator />
+      <Toast />
+    </NavigationContainer>
   );
-};
-
-export default App;
+}

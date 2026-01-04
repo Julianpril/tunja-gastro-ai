@@ -48,6 +48,7 @@ class Token(BaseModel):
     token_type: str
     user_id: int
     name: str
+    is_profile_complete: bool = False
 
 class RestaurantBase(BaseModel):
     name: str

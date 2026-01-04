@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ImageBackground, Dimensions } from 'react-native';
 import { colors } from '../utils/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -20,7 +21,8 @@ const THEME = {
 const { width } = Dimensions.get('window');
 
 const ProfileCompletionScreen = ({ navigation, route }) => {
-  const { userId, token } = route.params || {};
+  const [userId, setUserId] = useState(route.params?.userId || null);
+  const [token, setToken] = useState(route.params?.token || null);
   
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('');
@@ -28,6 +30,33 @@ const ProfileCompletionScreen = ({ navigation, route }) => {
   const [groupSize, setGroupSize] = useState('');
   const [visitMotive, setVisitMotive] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!userId) {
+        const storedUserId = await AsyncStorage.getItem('userId');
+        const storedToken = await AsyncStorage.getItem('userToken');
+        
+        if (storedUserId && storedUserId !== 'null' && storedUserId !== 'undefined') {
+          setUserId(storedUserId);
+        } else {
+            // If no user ID found, we can't proceed. Redirect to login.
+            Toast.show({
+                type: 'error',
+                text1: 'Error de sesión',
+                text2: 'Por favor inicia sesión nuevamente.'
+            });
+            navigation.replace('Login');
+            return;
+        }
+
+        if (storedToken) {
+            setToken(storedToken);
+        }
+      }
+    };
+    loadUserData();
+  }, []);
 
   const handleSubmit = async () => {
     if (!age || !gender || !country) {
@@ -37,6 +66,15 @@ const ProfileCompletionScreen = ({ navigation, route }) => {
         text2: 'Por favor completa edad, género y país.'
       });
       return;
+    }
+
+    if (!userId) {
+        Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: 'No se pudo identificar el usuario.'
+        });
+        return;
     }
 
     setLoading(true);
@@ -55,6 +93,8 @@ const ProfileCompletionScreen = ({ navigation, route }) => {
         text2: 'Perfil actualizado con éxito.'
       });
 
+      await AsyncStorage.setItem('isProfileComplete', 'true');
+
       navigation.reset({
         index: 0,
         routes: [{ name: 'Main' }],
@@ -71,10 +111,11 @@ const ProfileCompletionScreen = ({ navigation, route }) => {
     }
   };
 
-  const renderOption = (label, value, currentValue, setValue, iconName) => (
+  const renderOption = (label, value, currentValue, setValue, iconName, customStyle = {}) => (
     <TouchableOpacity
       style={[
         styles.optionCard,
+        customStyle,
         currentValue === value && styles.optionCardSelected
       ]}
       onPress={() => setValue(value)}
@@ -126,10 +167,10 @@ const ProfileCompletionScreen = ({ navigation, route }) => {
             {/* Gender Selection */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Género</Text>
-              <View style={styles.optionsRow}>
-                {renderOption('Femenino', 'Femenino', gender, setGender, 'gender-female')}
-                {renderOption('Masculino', 'Masculino', gender, setGender, 'gender-male')}
-                {renderOption('Otro', 'Otro', gender, setGender, 'gender-non-binary')}
+              <View style={styles.optionsGrid}>
+                {renderOption('Femenino', 'Femenino', gender, setGender, 'gender-female', { minWidth: '28%' })}
+                {renderOption('Masculino', 'Masculino', gender, setGender, 'gender-male', { minWidth: '28%' })}
+                {renderOption('Otro', 'Otro', gender, setGender, 'gender-non-binary', { minWidth: '28%' })}
               </View>
             </View>
 
@@ -187,12 +228,6 @@ const ProfileCompletionScreen = ({ navigation, route }) => {
               <Icon name="silverware-fork-knife" size={24} color="#FFF" style={{ marginLeft: 10 }} />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={styles.skipButton} 
-              onPress={() => navigation.replace('Main')}
-            >
-              <Text style={styles.skipButtonText}>Omitir por ahora</Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>

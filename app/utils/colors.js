@@ -25,6 +25,8 @@ export const shadow = {
     shadowOpacity: 0.05,
     shadowRadius: 3.84,
     elevation: 2,
+    // Web compatibility
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.05)',
   },
   medium: {
     shadowColor: "#10B981", // Tint of primary for wow effect
@@ -35,5 +37,7 @@ export const shadow = {
     shadowOpacity: 0.15,
     shadowRadius: 10,
     elevation: 5,
+    // Web compatibility
+    boxShadow: '0px 4px 10px rgba(16, 185, 129, 0.15)',
   },
 };

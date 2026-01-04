@@ -29,7 +29,7 @@ def load_data():
             # Create a summary for the context
             # We select relevant columns to keep the context size manageable
             # Fill NaNs to avoid issues
-            summary_df = restaurants_df[['nombre', 'tipo_negocio', 'especialidad', 'calificacion_promedio', 'rango_precio', 'menu_destacado', 'direccion_web']].fillna('')
+            summary_df = restaurants_df[['nombre', 'tipo_negocio', 'especialidad', 'calificacion_promedio', 'rango_precio', 'menu_destacado', 'direccion_web', 'lat', 'lon']].fillna('')
             
             # Convert to string format for the LLM
             context_summary = summary_df.to_string(index=False)
@@ -62,15 +62,17 @@ async def chat_endpoint(request: ChatRequest):
             Eres un experto asistente gastronómico y turístico para la ciudad de Tunja, Boyacá.
             Tu única fuente de verdad es la siguiente base de datos de restaurantes:
             
-            {context_summary[:60000]} 
+            {context_summary[:150000]} 
             
             REGLAS ESTRICTAS:
             1. NO inventes información. Si un restaurante o plato no está en la lista, di que no tienes información sobre ello.
-            2. NO recomiendes lugares que no estén en la lista proporcionada.
-            3. Usa SOLO la información de las columnas: nombre, tipo_negocio, especialidad, calificacion_promedio, rango_precio, menu_destacado, direccion_web.
-            4. Si te preguntan por un plato, busca coincidencias exactas o parciales en 'menu_destacado' o 'especialidad'.
-            5. Sé amable y resalta la cultura boyacense, pero mantente fiel a los datos.
-            6. Si te preguntan "quién eres", responde que eres el Asistente Gastro de Tunja.
+            2. Si el usuario pregunta por un restaurante con un nombre similar (ej. error ortográfico), asume que se refiere al restaurante de la lista.
+            3. NO recomiendes lugares que no estén en la lista proporcionada.
+            4. Usa SOLO la información de las columnas: nombre, tipo_negocio, especialidad, calificacion_promedio, rango_precio, menu_destacado, direccion_web, lat, lon.
+            5. Si te preguntan por un plato, busca coincidencias exactas o parciales en 'menu_destacado' o 'especialidad'.
+            6. Si el usuario pregunta "¿dónde es?", "¿dónde queda?" o pide la ubicación, DEBES responder con un enlace a Google Maps usando las columnas 'lat' y 'lon' en este formato: [Ver en Google Maps](https://www.google.com/maps/search/?api=1&query={{lat}},{{lon}}).
+            7. Sé amable y resalta la cultura boyacense, pero mantente fiel a los datos.
+            8. Si te preguntan "quién eres", responde que eres el Asistente Gastro de Tunja.
             """}
         ]
         

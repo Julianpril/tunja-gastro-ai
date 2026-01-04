@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, shadow } from '../utils/colors';
@@ -50,6 +50,51 @@ export default function ChatScreen() {
         }
     };
 
+    const renderMessageContent = (text, isUser) => {
+        if (isUser) {
+            return <Text style={[styles.msgText, styles.userText]}>{text}</Text>;
+        }
+
+        // Split by Google Maps link
+        const parts = text.split(/(\[Ver en Google Maps\]\(.*?\))/g);
+        
+        return (
+            <View style={{ flexDirection: 'column', flex: 1 }}>
+                {parts.map((part, index) => {
+                    if (!part) return null;
+
+                    const mapMatch = part.match(/\[Ver en Google Maps\]\((.*?)\)/);
+                    if (mapMatch) {
+                        const url = mapMatch[1];
+                        return (
+                            <TouchableOpacity 
+                                key={index} 
+                                style={styles.mapButton}
+                                onPress={() => Linking.openURL(url)}
+                            >
+                                <Ionicons name="map" size={20} color="white" style={{ marginRight: 8 }} />
+                                <Text style={styles.mapButtonText}>Ver ubicación en Mapa</Text>
+                            </TouchableOpacity>
+                        );
+                    }
+                    
+                    // Handle bold text: **text**
+                    const boldParts = part.split(/(\*\*.*?\*\*)/g);
+                    return (
+                        <Text key={index} style={[styles.msgText, styles.botText, { marginBottom: 4 }]}>
+                            {boldParts.map((subPart, subIndex) => {
+                                if (subPart.startsWith('**') && subPart.endsWith('**')) {
+                                    return <Text key={subIndex} style={{ fontWeight: 'bold' }}>{subPart.slice(2, -2)}</Text>;
+                                }
+                                return subPart;
+                            })}
+                        </Text>
+                    );
+                })}
+            </View>
+        );
+    };
+
     const renderItem = ({ item }) => {
         const isUser = item.sender === 'user';
         return (
@@ -63,7 +108,7 @@ export default function ChatScreen() {
                         <Ionicons name="restaurant" size={14} color="white" />
                     </View>
                 )}
-                <Text style={[styles.msgText, isUser ? styles.userText : styles.botText]}>{item.text}</Text>
+                {renderMessageContent(item.text, isUser)}
             </View>
         );
     };
@@ -217,5 +262,22 @@ const styles = StyleSheet.create({
     },
     sendBtnActive: {
         backgroundColor: colors.primary,
+    },
+    mapButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.secondary,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        marginTop: 8,
+        marginBottom: 8,
+        alignSelf: 'flex-start',
+        ...shadow.small,
+    },
+    mapButtonText: {
+        color: 'white',
+        fontWeight: '600',
+        fontSize: 14,
     }
 });

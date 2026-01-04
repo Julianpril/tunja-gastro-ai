@@ -33,10 +33,11 @@ api.interceptors.request.use(
 export const login = async (email, password) => {
     try {
         const response = await api.post('/auth/login', { email, password });
-        const { access_token, user_id, name } = response.data;
+        const { access_token, user_id, name, is_profile_complete } = response.data;
         await AsyncStorage.setItem('userToken', access_token);
         await AsyncStorage.setItem('userId', String(user_id));
         await AsyncStorage.setItem('userName', name);
+        await AsyncStorage.setItem('isProfileComplete', String(is_profile_complete));
         return response.data;
     } catch (error) {
         console.error('Login Error:', error.response?.data || error.message);

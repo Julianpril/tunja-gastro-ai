@@ -43,9 +43,13 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         data={"sub": db_user.email}, expires_delta=access_token_expires
     )
     
+    # Check if profile is complete (critical fields for ML)
+    is_complete = bool(db_user.age and db_user.gender and db_user.country)
+
     return {
         "access_token": access_token, 
         "token_type": "bearer",
         "user_id": db_user.id,
-        "name": db_user.name
+        "name": db_user.name,
+        "is_profile_complete": is_complete
     }

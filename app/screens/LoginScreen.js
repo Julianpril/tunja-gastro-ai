@@ -30,8 +30,18 @@ const LoginScreen = ({ navigation }) => {
   const checkExistingSession = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      if (token) {
-        navigation.replace('Main');
+      const userId = await AsyncStorage.getItem('userId');
+      const isProfileComplete = await AsyncStorage.getItem('isProfileComplete');
+
+      if (token && userId) {
+        if (isProfileComplete === 'true') {
+          navigation.replace('Main');
+        } else {
+          navigation.replace('ProfileCompletion', { userId, token });
+        }
+      } else if (token && !userId) {
+        // Invalid session state, clear it
+        await AsyncStorage.multiRemove(['userToken', 'userId', 'userName', 'isProfileComplete']);
       }
     } catch (e) {
       console.log('Error checking session', e);
@@ -50,13 +60,21 @@ const LoginScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      await login(email, password);
+      const response = await login(email, password);
       Toast.show({
         type: 'success',
         text1: '¡Bienvenido!',
         text2: 'Has iniciado sesión correctamente'
       });
-      navigation.replace('Main');
+      
+      if (response.is_profile_complete) {
+        navigation.replace('Main');
+      } else {
+        navigation.replace('ProfileCompletion', { 
+          userId: response.user_id, 
+          token: response.access_token 
+        });
+      }
     } catch (error) {
       Toast.show({
         type: 'error',

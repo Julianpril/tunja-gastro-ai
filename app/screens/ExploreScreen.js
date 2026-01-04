@@ -1,38 +1,69 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Dimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import MapView, { Marker, PROVIDER_DEFAULT } from '../components/MapView';
+import * as Location from 'expo-location';
 import { colors, shadow } from '../utils/colors';
 import { getRecommendations } from '../services/api';
+
+const { width, height } = Dimensions.get('window');
 
 export const ExploreScreen = ({ navigation }) => {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+    const [location, setLocation] = useState(null);
+    const [errorMsg, setErrorMsg] = useState(null);
+
+    // Default to Tunja Plaza de Bolívar
+    const [mapRegion, setMapRegion] = useState({
+        latitude: 5.5324,
+        longitude: -73.3614,
+        latitudeDelta: 0.015,
+        longitudeDelta: 0.0121,
+    });
 
     useEffect(() => {
         // Load initial data
         searchFood('');
+        // Get Location
+        (async () => {
+            let { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                setErrorMsg('Permiso de ubicación denegado');
+                return;
+            }
+
+            let loc = await Location.getCurrentPositionAsync({});
+            setLocation(loc);
+            setMapRegion({
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+                latitudeDelta: 0.015,
+                longitudeDelta: 0.0121,
+            });
+        })();
     }, []);
 
     const searchFood = async (text) => {
         setQuery(text);
         setLoading(true);
-        // In a real app, hit a search endpoint. For now, we reuse getRecommendations to simulate results
         try {
             const data = await getRecommendations();
             
-            // Map data to ensure flat structure for UI
+            // Map data to ensure flat structure for UI but keep restaurant data
             const mappedData = data.map(item => ({
                 ...item,
-                image: item.image_url || item.image, // Handle both cases
-                restaurant: item.restaurant?.name || "Restaurante Local"
+                image: item.image_url || item.image, 
+                restaurantName: item.restaurant?.name || "Restaurante Local",
+                restaurantData: item.restaurant // Keep full object for coordinates
             }));
 
-            // Simple client-side filtering simulation
             const filtered = mappedData.filter(d => 
                 d.name.toLowerCase().includes(text.toLowerCase()) || 
-                d.restaurant.toLowerCase().includes(text.toLowerCase())
+                d.restaurantName.toLowerCase().includes(text.toLowerCase())
             );
             setResults(filtered);
         } catch (err) {
@@ -40,6 +71,25 @@ export const ExploreScreen = ({ navigation }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Extract unique restaurants for Map Markers
+    const getUniqueRestaurants = () => {
+        const unique = {};
+        results.forEach(item => {
+            if (item.restaurantData && item.restaurantData.latitude && item.restaurantData.longitude) {
+                // Use restaurant name as key to deduplicate
+                if (!unique[item.restaurantName]) {
+                    unique[item.restaurantName] = {
+                        ...item.restaurantData,
+                        dishes: [item] // Keep track of dishes here if needed
+                    };
+                } else {
+                    unique[item.restaurantName].dishes.push(item);
+                }
+            }
+        });
+        return Object.values(unique);
     };
 
     const renderItem = ({ item }) => (
@@ -51,7 +101,7 @@ export const ExploreScreen = ({ navigation }) => {
             <Image source={{ uri: item.image }} style={styles.cardImage} />
             <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
-                <Text style={styles.cardSubtitle}>{item.restaurant}</Text>
+                <Text style={styles.cardSubtitle}>{item.restaurantName}</Text>
                 <View style={styles.ratingRow}>
                     <Ionicons name="star" size={14} color="#FFD700" />
                     <Text style={styles.ratingText}>{item.rating}</Text>
@@ -64,7 +114,20 @@ export const ExploreScreen = ({ navigation }) => {
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
-                <Text style={styles.title}>Explorar</Text>
+                <Text style={styles.title}>Explorar Tunja</Text>
+                <TouchableOpacity 
+                    style={styles.toggleButton}
+                    onPress={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
+                >
+                    <Ionicons 
+                        name={viewMode === 'list' ? "map" : "list"} 
+                        size={24} 
+                        color={colors.primary} 
+                    />
+                    <Text style={styles.toggleText}>
+                        {viewMode === 'list' ? "Ver Mapa" : "Ver Lista"}
+                    </Text>
+                </TouchableOpacity>
             </View>
 
             <View style={styles.searchContainer}>
@@ -85,10 +148,10 @@ export const ExploreScreen = ({ navigation }) => {
 
             {loading ? (
                 <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
-            ) : (
+            ) : viewMode === 'list' ? (
                 <FlatList
                     data={results}
-                    keyExtractor={item => item.id}
+                    keyExtractor={item => item.id.toString()}
                     renderItem={renderItem}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
@@ -98,6 +161,32 @@ export const ExploreScreen = ({ navigation }) => {
                         </View>
                     }
                 />
+            ) : (
+                <View style={styles.mapContainer}>
+                    <MapView
+                        style={styles.map}
+                        region={mapRegion}
+                        showsUserLocation={true}
+                        showsMyLocationButton={true}
+                    >
+                        {getUniqueRestaurants().map((rest, index) => (
+                            <Marker
+                                key={index}
+                                coordinate={{
+                                    latitude: rest.latitude,
+                                    longitude: rest.longitude
+                                }}
+                                title={rest.name}
+                                description={rest.cuisine_type}
+                            >
+                                <View style={styles.markerContainer}>
+                                    <Ionicons name="restaurant" size={20} color="#FFF" />
+                                </View>
+                            </Marker>
+                        ))}
+                    </MapView>
+                    {/* Floating Card for selected restaurant could go here */}
+                </View>
             )}
         </SafeAreaView>
     );
@@ -111,11 +200,28 @@ const styles = StyleSheet.create({
     header: {
         paddingHorizontal: 24,
         paddingVertical: 16,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     title: {
         fontSize: 28,
         fontWeight: 'bold',
         color: colors.text.primary,
+    },
+    toggleButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#E8F5E9',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+    },
+    toggleText: {
+        marginLeft: 6,
+        color: colors.primary,
+        fontWeight: '600',
+        fontSize: 14,
     },
     searchContainer: {
         flexDirection: 'row',
@@ -183,4 +289,24 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: 40,
     },
+    mapContainer: {
+        flex: 1,
+        borderRadius: 20,
+        overflow: 'hidden',
+        marginHorizontal: 20,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    map: {
+        width: '100%',
+        height: '100%',
+    },
+    markerContainer: {
+        backgroundColor: colors.primary,
+        padding: 8,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: '#FFF',
+    }
 });

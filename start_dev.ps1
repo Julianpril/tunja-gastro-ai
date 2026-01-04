@@ -10,4 +10,5 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "& { Set-Location 
 Write-Host "Lanzando Frontend (Expo)..." -ForegroundColor Cyan
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "& { Set-Location '$rootPath\app'; npx expo start }"
 
-Write-Host "¡Todo listo! Revisa las nuevas ventanas de PowerShell." -ForegroundColor Green
+Write-Host "¡Todo listo! Revisa las nuevas ventanas de PowerShell. VIVA PETRO!!!!" -ForegroundColor Green
+    

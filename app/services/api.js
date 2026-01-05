@@ -10,7 +10,7 @@ const DEV_API_URL = Platform.OS === 'android'
 
 const api = axios.create({
     baseURL: DEV_API_URL,
-    timeout: 10000,
+    timeout: 60000, // Increased to 60s for AI generation
     headers: {
         'Content-Type': 'application/json',
     },
@@ -105,12 +105,17 @@ export const getUserProfile = async () => {
 };
 
 // Placeholder for future ML endpoints
-export const getRecommendations = async () => {
+export const getRecommendations = async (category = null) => {
     try {
         const userId = await AsyncStorage.getItem('userId');
         if (!userId) return getDishes(); // Fallback if no user logged in
 
-        const response = await api.get(`/recommendations/${userId}`);
+        let url = `/recommendations/${userId}`;
+        if (category && category !== 'Recomendado') {
+            url += `?category=${encodeURIComponent(category)}`;
+        }
+
+        const response = await api.get(url);
         return response.data;
     } catch (error) {
         console.error('Get Recommendations Error:', error);
@@ -138,6 +143,35 @@ export const getEnrichedDishDetails = async (dishId) => {
         return response.data;
     } catch (error) {
         console.error('Get Enriched Dish Details Error:', error);
+        throw error;
+    }
+};
+
+export const getItinerary = async (days = 1) => {
+    try {
+        const userId = await AsyncStorage.getItem('userId');
+        if (!userId) {
+            console.warn("getItinerary: No userId found in AsyncStorage");
+            throw new Error("No user logged in");
+        }
+
+        console.log(`Requesting itinerary for user ${userId}, days: ${days}`);
+        const response = await api.post(`/itinerary/generate/${userId}`, { days });
+        console.log("Itinerary response:", response.status);
+        return response.data;
+    } catch (error) {
+        if (error.response) {
+            // The request was made and the server responded with a status code
+            // that falls out of the range of 2xx
+            console.error('Get Itinerary Error Data:', error.response.data);
+            console.error('Get Itinerary Error Status:', error.response.status);
+        } else if (error.request) {
+            // The request was made but no response was received
+            console.error('Get Itinerary Error: No response received', error.request);
+        } else {
+            // Something happened in setting up the request that triggered an Error
+            console.error('Get Itinerary Error Message:', error.message);
+        }
         throw error;
     }
 };

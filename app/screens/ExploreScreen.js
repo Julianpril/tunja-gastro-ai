@@ -9,7 +9,7 @@ import { getRecommendations } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 
-export const ExploreScreen = ({ navigation }) => {
+export const ExploreScreen = ({ navigation, route }) => {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -24,6 +24,12 @@ export const ExploreScreen = ({ navigation }) => {
         latitudeDelta: 0.015,
         longitudeDelta: 0.0121,
     });
+
+    useEffect(() => {
+        if (route?.params?.viewMode) {
+            setViewMode(route.params.viewMode);
+        }
+    }, [route?.params]);
 
     useEffect(() => {
         // Load initial data

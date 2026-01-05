@@ -48,6 +48,8 @@ export default function DishDetailScreen({ route, navigation }) {
     const price = dish.price || 25000;
     
     const culturalDesc = enrichedData?.cultural_desc || dish.culturalDesc || dish.description || "Plato tradicional de la región.";
+    const aiIngredients = enrichedData?.main_ingredients;
+
     const reviews = enrichedData?.reviews || [
         { id: 1, user: 'Ana M.', rating: 5, comment: '¡Delicioso! Sabe igual al de mi abuela.' },
         { id: 2, user: 'Carlos R.', rating: 4, comment: 'Muy bueno, pero la porción es gigante.' }
@@ -117,13 +119,19 @@ export default function DishDetailScreen({ route, navigation }) {
                     )}
 
                     <Text style={styles.sectionTitle}>Ingredientes Principales</Text>
-                    <View style={styles.ingredientsContainer}>
-                        {ingredients.map((ing, index) => (
-                            <View key={index} style={styles.ingredientChip}>
-                                <Text style={styles.ingredientText}>{ing}</Text>
-                            </View>
-                        ))}
-                    </View>
+                    {loading ? (
+                         <ActivityIndicator size="small" color={colors.primary} style={{ alignSelf: 'flex-start', marginVertical: 10 }} />
+                    ) : aiIngredients ? (
+                        <Text style={styles.description}>{aiIngredients}</Text>
+                    ) : (
+                        <View style={styles.ingredientsContainer}>
+                            {ingredients.map((ing, index) => (
+                                <View key={index} style={styles.ingredientChip}>
+                                    <Text style={styles.ingredientText}>{ing}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
 
                     <View style={styles.divider} />
 

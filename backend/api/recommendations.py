@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import pandas as pd
 import joblib
 import os
@@ -30,13 +30,40 @@ def load_model():
 load_model()
 
 @router.get("/{user_id}", response_model=List[DishResponse])
-def get_recommendations(user_id: int, db: Session = Depends(get_db)):
+def get_recommendations(user_id: int, category: Optional[str] = None, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     # 1. Get all dishes with their restaurant info
-    all_dishes = db.query(Dish).join(Restaurant).all()
+    query = db.query(Dish).join(Restaurant)
+    
+    # Apply Filters BEFORE ML (Candidate Selection)
+    if category:
+        if category == "Regionales":
+            query = query.filter(Dish.is_regional == True)
+        elif category == "Sin Carne": # Vegetariano
+            # Filter out dishes with meat keywords in ingredients or description
+            # This is a basic implementation. In production, use a tag system.
+            query = query.filter(
+                (Dish.name.ilike("%vegetariano%")) | 
+                (Dish.description.ilike("%vegetariano%")) |
+                (~Dish.ingredients.ilike("%carne%") & ~Dish.ingredients.ilike("%pollo%") & ~Dish.ingredients.ilike("%cerdo%") & ~Dish.ingredients.ilike("%pescado%"))
+            )
+        elif category == "Sin Gluten": # Sin Harina/Trigo
+            query = query.filter(
+                ~Dish.ingredients.ilike("%trigo%") & 
+                ~Dish.ingredients.ilike("%harina%") & 
+                ~Dish.ingredients.ilike("%pan%") &
+                ~Dish.ingredients.ilike("%pasta%")
+            )
+        elif category == "Económico":
+            query = query.filter(Dish.price <= 20000)
+        # 'Recomendado' is default (no filter)
+        elif category == "Pet Friendly":
+             query = query.filter(Restaurant.is_pet_friendly == True)
+
+    all_dishes = query.all()
     
     if not all_dishes:
         return []
@@ -126,6 +153,8 @@ def get_recommendations(user_id: int, db: Session = Depends(get_db)):
             
         except Exception as e:
             print(f"ML Prediction failed: {e}. Falling back to rule-based.")
+            import traceback
+            traceback.print_exc()
             # Fallback logic below
     
     # Fallback: Rule-Based Recommendation System (if model fails or is missing)

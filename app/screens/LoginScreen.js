@@ -218,11 +218,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
+      },
+      default: {
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+      },
+    }),
   },
   logoText: {
     color: 'white',
@@ -270,11 +277,18 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginTop: 10,
-    elevation: 3,
-    shadowColor: '#FF6B6B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 4.65px rgba(255, 107, 107, 0.3)',
+      },
+      default: {
+        elevation: 3,
+        shadowColor: '#FF6B6B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4.65,
+      },
+    }),
   },
   loginButtonText: {
     color: 'white',

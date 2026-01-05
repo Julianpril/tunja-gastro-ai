@@ -13,7 +13,7 @@ const CARD_WIDTH = width * 0.6;
 const CARD_MARGIN = 16;
 const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN;
 
-const FILTERS = ['Recomendado', 'Regionales', 'Vegetariano', 'Económico', 'Pet Friendly'];
+const FILTERS = ['Recomendado', 'Sin Carne', 'Sin Gluten', 'Regionales', 'Económico'];
 
 export default function HomeScreen({ navigation }) {
     const [selectedFilter, setSelectedFilter] = useState('Recomendado');
@@ -24,8 +24,8 @@ export default function HomeScreen({ navigation }) {
 
     useEffect(() => {
         loadUserData();
-        loadRecommendations();
-    }, []);
+        loadRecommendations(selectedFilter);
+    }, [selectedFilter]); // Reload when filter changes
 
     const loadUserData = async () => {
         try {
@@ -36,10 +36,10 @@ export default function HomeScreen({ navigation }) {
         }
     };
 
-    const loadRecommendations = async () => {
+    const loadRecommendations = async (filter) => {
         setLoading(true);
         try {
-            const data = await getRecommendations();
+            const data = await getRecommendations(filter);
             // Map API response to UI model
             const mappedData = data.map(item => ({
                 ...item,
@@ -135,9 +135,9 @@ export default function HomeScreen({ navigation }) {
                 {/* Map Preview Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Cerca de ti</Text>
-                    <TouchableOpacity style={[styles.mapContainer, shadow.small]} activeOpacity={0.9} onPress={() => navigation.navigate('Mapa')}>
+                    <TouchableOpacity style={[styles.mapContainer, shadow.small]} activeOpacity={0.9} onPress={() => navigation.navigate('Explorar', { viewMode: 'map' })}>
                         <Image
-                            source={{ uri: 'https://i.stack.imgur.com/ddX9U.png' }} // Generic map placeholder
+                            source={{ uri: 'https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?auto=format&fit=crop&w=600&q=80' }} // Generic map placeholder
                             style={styles.mapImage}
                         />
                         <View style={styles.mapOverlay}>

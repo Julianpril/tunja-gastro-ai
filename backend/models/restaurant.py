@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Text
+from sqlalchemy import Column, Integer, String, Float, Text, Boolean
 from sqlalchemy.orm import relationship
 from backend.db.session import Base
 
@@ -15,6 +15,7 @@ class Restaurant(Base):
     image_url = Column(String)
     price_range = Column(String) # $, $$, $$$
     cuisine_type = Column(String)
+    is_pet_friendly = Column(Boolean, default=False)
     
     # Relationships
     dishes = relationship("Dish", back_populates="restaurant")

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ImageBackground, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ImageBackground, Dimensions, Platform } from 'react-native';
 import { colors } from '../utils/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../services/api';
@@ -282,14 +282,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderRadius: 20,
     padding: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 8,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.1)',
+      },
+      default: {
+        shadowColor: "#000",
+        shadowOffset: {
+          width: 0,
+          height: 4,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 8,
+      },
+    }),
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.05)',
   },
@@ -379,11 +386,18 @@ const styles = StyleSheet.create({
     // 3D Button effect
     borderBottomWidth: 5,
     borderBottomColor: '#007A2D',
-    shadowColor: THEME.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 6,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 5px rgba(16, 185, 129, 0.3)',
+      },
+      default: {
+        shadowColor: THEME.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 5,
+      },
+    }),
   },
   submitButtonText: {
     color: '#FFF',

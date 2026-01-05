@@ -181,10 +181,20 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
             # Sort by predicted score (descending)
             scored_dishes.sort(key=lambda x: x[1], reverse=True)
             
-            # Return top 10
-            recommended_dishes = [item[0] for item in scored_dishes[:10]]
-            print(f"User {user_id} ({user.regional_interest}): Top recommendations = {[d.name for d in recommended_dishes[:3]]}")
-            return recommended_dishes
+            # DEDUPLICATION: Only show each dish name once (pick best-rated restaurant)
+            seen_dish_names = set()
+            unique_dishes = []
+            for dish, score in scored_dishes:
+                # Normalize dish name for comparison (lowercase, strip whitespace)
+                dish_name_normalized = dish.name.lower().strip()
+                if dish_name_normalized not in seen_dish_names:
+                    seen_dish_names.add(dish_name_normalized)
+                    unique_dishes.append(dish)
+                    if len(unique_dishes) >= 10:
+                        break
+            
+            print(f"User {user_id} ({user.regional_interest}): Top recommendations = {[d.name for d in unique_dishes[:3]]}")
+            return unique_dishes
             
         except Exception as e:
             print(f"ML Prediction failed: {e}. Falling back to rule-based.")
@@ -210,5 +220,17 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
         scored_dishes.append((dish, score))
     
     scored_dishes.sort(key=lambda x: x[1], reverse=True)
-    return [item[0] for item in scored_dishes[:10]]
+    
+    # DEDUPLICATION: Only show each dish name once
+    seen_dish_names = set()
+    unique_dishes = []
+    for dish, score in scored_dishes:
+        dish_name_normalized = dish.name.lower().strip()
+        if dish_name_normalized not in seen_dish_names:
+            seen_dish_names.add(dish_name_normalized)
+            unique_dishes.append(dish)
+            if len(unique_dishes) >= 10:
+                break
+    
+    return unique_dishes
 

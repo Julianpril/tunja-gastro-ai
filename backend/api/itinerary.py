@@ -51,16 +51,8 @@ async def generate_itinerary(user_id: int, request: ItineraryRequest, db: Sessio
     - Acompañantes: {user.group_size or 1} personas
     """
 
-    prompt = f"""
-    Actúa como un experto guía turístico y gastronómico de Tunja.
-    Genera un itinerario detallado de {request.days} día(s) para este turista.
-    
-    {user_profile}
-
-    Usa EXCLUSIVAMENTE la siguiente base de datos de restaurantes para las recomendaciones de comida:
-    {context_summary[:50000]} 
-
-    Formato de Respuesta (JSON estricto):
+    # Build prompt without f-string for JSON example to avoid escaping issues
+    json_example = '''
     {
       "itinerary": [
         {
@@ -71,12 +63,30 @@ async def generate_itinerary(user_id: int, request: ItineraryRequest, db: Sessio
               "type": "Desayuno",
               "title": "Nombre del Lugar o Plato",
               "description": "Breve descripción de por qué es buena opción",
-              "image": "https://placeholder.com/image.jpg"
+              "image_search": "colombian breakfast arepa coffee"
             }
           ]
         }
       ]
     }
+    '''
+    
+    prompt = f"""
+    Actúa como un experto guía turístico y gastronómico de Tunja.
+    Genera un itinerario detallado de {request.days} día(s) para este turista.
+    
+    {user_profile}
+
+    Usa EXCLUSIVAMENTE la siguiente base de datos de restaurantes para las recomendaciones de comida:
+    {context_summary[:50000]} 
+
+    INSTRUCCIONES PARA IMÁGENES:
+    - NO uses "image", usa "image_search" con términos de búsqueda en inglés para Unsplash
+    - Los términos deben describir el plato o lugar específico (ej: "colombian soup wheat pork" para cuchuco)
+    - Usa 3-5 palabras clave relevantes en inglés
+    
+    Formato de Respuesta (JSON estricto):
+    {json_example}
     
     Asegúrate de que el JSON sea válido. No incluyas texto fuera del JSON.
     """
@@ -114,11 +124,72 @@ async def generate_itinerary(user_id: int, request: ItineraryRequest, db: Sessio
             
         itinerary_json = json.loads(content)
         
+        # Post-process: Convert image_search terms to Unsplash URLs
+        def search_to_unsplash_url(search_terms, activity_type="", title=""):
+            """Convert search terms to Unsplash Source URL (free, no API key needed)"""
+            import urllib.parse
+            
+            # Use provided search terms, or generate from activity/title
+            if search_terms and isinstance(search_terms, str) and len(search_terms) > 2:
+                query = search_terms
+            else:
+                # Fallback: generate terms from activity type and title
+                activity_type = (activity_type or "").lower()
+                title_lower = (title or "").lower()
+                
+                if "desayuno" in activity_type:
+                    query = "colombian breakfast arepa coffee"
+                elif "almuerzo" in activity_type:
+                    if "cuchuco" in title_lower:
+                        query = "colombian wheat soup traditional"
+                    elif "cocido" in title_lower or "sancocho" in title_lower:
+                        query = "colombian stew meat vegetables"
+                    else:
+                        query = "colombian lunch traditional food"
+                elif "cena" in activity_type:
+                    query = "dinner restaurant elegant food"
+                elif "café" in activity_type or "onces" in activity_type or "snack" in activity_type:
+                    query = "colombian coffee pastry bakery"
+                elif "cultural" in activity_type or "visita" in activity_type or "tour" in activity_type:
+                    query = "colombia colonial architecture church"
+                else:
+                    query = "colombian restaurant food traditional"
+            
+            # Clean and encode the query
+            query = query.strip().replace("  ", " ")
+            encoded_query = urllib.parse.quote(query)
+            
+            # Use Unsplash Source (redirects to a random matching image)
+            # Format: https://source.unsplash.com/800x600/?query
+            return f"https://source.unsplash.com/800x600/?{encoded_query}"
+        
+        def fix_itinerary_images(itinerary_data):
+            """Convert image_search to real Unsplash URLs"""
+            if isinstance(itinerary_data, list):
+                for day in itinerary_data:
+                    if isinstance(day, dict) and 'activities' in day:
+                        for activity in day['activities']:
+                            if isinstance(activity, dict):
+                                # Get search terms from AI response
+                                search_terms = activity.pop('image_search', None)
+                                
+                                # Also check if there's an existing invalid image
+                                existing_img = activity.get('image', '')
+                                
+                                if not existing_img or 'placeholder' in existing_img.lower() or not existing_img.startswith('http'):
+                                    activity['image'] = search_to_unsplash_url(
+                                        search_terms,
+                                        activity.get('type', ''), 
+                                        activity.get('title', '')
+                                    )
+            return itinerary_data
+        
         if isinstance(itinerary_json, dict) and 'itinerary' in itinerary_json:
-             return itinerary_json['itinerary']
+            fixed_itinerary = fix_itinerary_images(itinerary_json['itinerary'])
+            return fixed_itinerary
         
         # Fallback if structure is different but valid json
-        return itinerary_json
+        return fix_itinerary_images(itinerary_json) if isinstance(itinerary_json, list) else itinerary_json
 
     except Exception as e:
         import traceback

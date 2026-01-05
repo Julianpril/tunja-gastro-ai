@@ -38,7 +38,29 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
     # 1. Get all dishes with their restaurant info
     query = db.query(Dish).join(Restaurant)
     
-    # Apply Filters BEFORE ML (Candidate Selection)
+    # Apply User's Personal Restrictions ALWAYS (regardless of category)
+    user_restrictions = (user.restrictions or "").lower()
+    if "vegetariano" in user_restrictions or "vegano" in user_restrictions:
+        query = query.filter(
+            ~Dish.ingredients.ilike("%carne%") & 
+            ~Dish.ingredients.ilike("%pollo%") & 
+            ~Dish.ingredients.ilike("%cerdo%") & 
+            ~Dish.ingredients.ilike("%res%") &
+            ~Dish.ingredients.ilike("%pescado%") &
+            ~Dish.ingredients.ilike("%gallina%") &
+            ~Dish.ingredients.ilike("%chicharr%") &
+            ~Dish.ingredients.ilike("%longaniza%") &
+            ~Dish.ingredients.ilike("%tocino%")
+        )
+    if "gluten" in user_restrictions or "celiaco" in user_restrictions:
+        query = query.filter(
+            ~Dish.ingredients.ilike("%trigo%") & 
+            ~Dish.ingredients.ilike("%harina%") & 
+            ~Dish.ingredients.ilike("%pan%") &
+            ~Dish.ingredients.ilike("%pasta%")
+        )
+    
+    # Apply Category Filters (UI selection)
     if category:
         if category == "Regionales":
             query = query.filter(Dish.is_regional == True)
@@ -141,14 +163,27 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
             
             predictions = model.predict(df_predict)
             
-            # Attach predictions to dishes
-            scored_dishes = list(zip(all_dishes, predictions))
+            # Post-processing: Apply regional interest penalty/bonus
+            adjusted_predictions = []
+            for i, (dish, pred) in enumerate(zip(all_dishes, predictions)):
+                adjustment = 0
+                if user.regional_interest == "bajo" and dish.is_regional:
+                    adjustment = -2.0  # Penalize regional dishes for users with low interest
+                elif user.regional_interest == "alto" and dish.is_regional:
+                    adjustment = +1.5  # Bonus for regional dishes for users who love them
+                elif user.regional_interest == "bajo" and not dish.is_regional:
+                    adjustment = +1.0  # Bonus for non-regional for users with low interest
+                adjusted_predictions.append(pred + adjustment)
+            
+            # Attach adjusted predictions to dishes
+            scored_dishes = list(zip(all_dishes, adjusted_predictions))
             
             # Sort by predicted score (descending)
             scored_dishes.sort(key=lambda x: x[1], reverse=True)
             
             # Return top 10
             recommended_dishes = [item[0] for item in scored_dishes[:10]]
+            print(f"User {user_id} ({user.regional_interest}): Top recommendations = {[d.name for d in recommended_dishes[:3]]}")
             return recommended_dishes
             
         except Exception as e:
@@ -165,6 +200,10 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
             score += 10
         elif user.regional_interest == "medio" and dish.is_regional:
             score += 5
+        elif user.regional_interest == "bajo" and not dish.is_regional:
+            score += 8  # Prefer international food
+        elif user.regional_interest == "bajo" and dish.is_regional:
+            score -= 5  # Penalize regional food
         if user.budget and dish.price <= user.budget:
             score += 5
         score += dish.rating * 2

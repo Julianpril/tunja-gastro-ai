@@ -9,27 +9,37 @@ const MOCK_CHAT_HISTORY = [
     { id: '1', text: '¡Hola! Soy tu asistente gastronómico de Tunja. 🧑‍🍳 ¿En qué puedo ayudarte hoy?', sender: 'bot' },
 ];
 
+const QUICK_SUGGESTIONS = [
+    { id: 's1', icon: 'restaurant', text: '¿Dónde almorzar?', query: '¿Dónde me recomiendas almorzar hoy? Quiero algo tradicional' },
+    { id: 's2', icon: 'map', text: 'Platos regionales', query: '¿Cuáles son los platos más representativos de Tunja?' },
+    { id: 's3', icon: 'cash', text: 'Opciones económicas', query: 'Recomiéndame restaurantes económicos en Tunja' },
+    { id: 's4', icon: 'pizza', text: 'Comida internacional', query: '¿Dónde puedo comer comida internacional en Tunja?' },
+];
+
 export default function ChatScreen() {
     const [messages, setMessages] = useState(MOCK_CHAT_HISTORY);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(true);
     const flatListRef = useRef(null);
 
-    const sendMessage = async () => {
-        if (inputText.trim().length === 0) return;
+    const sendMessage = async (messageText = null) => {
+        const textToSend = (typeof messageText === 'string' ? messageText : null) || inputText;
+        
+        if (!textToSend || textToSend.trim().length === 0) return;
 
-        const userText = inputText; // Capture text before clearing
-        const userMsg = { id: Date.now().toString(), text: userText, sender: 'user' };
+        const userMsg = { id: Date.now().toString(), text: textToSend, sender: 'user' };
         
         setMessages(current => [...current, userMsg]);
         setInputText('');
         setIsTyping(true);
+        setShowSuggestions(false); // Hide suggestions after first message
 
         try {
             // Send the message and the history (excluding the one we just added locally for display, 
             // or we can pass it if we want. The backend logic appends the current message anyway.
             // So passing 'messages' (current state) is fine as history.
-            const response = await getChatResponse(userText, messages);
+            const response = await getChatResponse(textToSend, messages);
             
             const botResponse = {
                 id: (Date.now() + 1).toString(),
@@ -128,6 +138,24 @@ export default function ChatScreen() {
                 contentContainerStyle={styles.listContent}
                 onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
             />
+
+            {showSuggestions && (
+                <View style={styles.suggestionsContainer}>
+                    <Text style={styles.suggestionsTitle}>Sugerencias rápidas:</Text>
+                    <View style={styles.suggestionsGrid}>
+                        {QUICK_SUGGESTIONS.map(suggestion => (
+                            <TouchableOpacity
+                                key={suggestion.id}
+                                style={styles.suggestionChip}
+                                onPress={() => sendMessage(suggestion.query)}
+                            >
+                                <Ionicons name={suggestion.icon} size={18} color={colors.primary} />
+                                <Text style={styles.suggestionText}>{suggestion.text}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            )}
 
             {isTyping && (
                 <View style={styles.typingIndicator}>
@@ -279,5 +307,41 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: '600',
         fontSize: 14,
-    }
+    },
+    suggestionsContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: colors.surface,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+    },
+    suggestionsTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.text.secondary,
+        marginBottom: 10,
+    },
+    suggestionsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    suggestionChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.background,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: colors.primary,
+        marginRight: 8,
+        marginBottom: 8,
+    },
+    suggestionText: {
+        color: colors.primary,
+        fontSize: 13,
+        fontWeight: '600',
+        marginLeft: 6,
+    },
 });

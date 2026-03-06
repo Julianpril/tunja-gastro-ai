@@ -1,33 +1,47 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_
 from typing import List, Optional
 import pandas as pd
-import joblib
-import os
 import numpy as np
 from backend.db.session import get_db
 from backend.models import Dish, User, Restaurant
 from backend.schemas import DishResponse
+from backend.services.ml_model import get_model
 
 router = APIRouter()
 
-# Load ML Model
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "modelo_hibrido_v1.pkl")
-model = None
+# Complete list of non-vegetarian ingredient/name keywords
+MEAT_KEYWORDS = [
+    "carne", "pollo", "cerdo", "pescado", "gallina", "chicharr",
+    "longaniza", "tocino", "salchicha", "chorizo", "jamón", "jamon",
+    "alitas", "camarón", "camaron", "camarones", "marisco", "mariscos",
+    "pulpo", "costilla", "lomo", "pechuga", "bondiola", "espinazo",
+    "sobrebarriga", "desmechada", "chuleta", "cordero", "pavo",
+    "atún", "atun", "salmón", "salmon", "langostino", "cangrejo",
+    "mojarra", "trucha", "róbalo", "robalo", "morcilla", "hamburguesa",
+    "nugget", "perro caliente", "hot dog", "steak",
+    "filete", "solomillo", "ridículo",
+]
 
-def load_model():
-    global model
-    try:
-        if os.path.exists(MODEL_PATH):
-            model = joblib.load(MODEL_PATH)
-            print("Recommendation Model loaded successfully")
-        else:
-            print(f"Recommendation Model not found at {MODEL_PATH}")
-    except Exception as e:
-        print(f"Error loading Recommendation Model: {e}")
+# Additional patterns that need word-boundary matching (e.g. "res" as standalone)
+MEAT_BOUNDARY_PATTERNS = [
+    "% res,%", "% res %", "%de res%", "%res,%", "res,%",
+    "%(res)%", "%(res %",
+]
 
-# Load on module import
-load_model()
+def _apply_no_meat_filter(query):
+    """Filter out dishes containing meat/fish/seafood in ingredients, name, or description."""
+    conditions = []
+    for kw in MEAT_KEYWORDS:
+        conditions.append(~Dish.ingredients.ilike(f"%{kw}%"))
+        conditions.append(~Dish.name.ilike(f"%{kw}%"))
+        conditions.append(~Dish.description.ilike(f"%{kw}%"))
+    # Word-boundary patterns for short words like "res"
+    for pattern in MEAT_BOUNDARY_PATTERNS:
+        conditions.append(~Dish.ingredients.ilike(pattern))
+    return query.filter(and_(*conditions))
+
 
 @router.get("/{user_id}", response_model=List[DishResponse])
 def get_recommendations(user_id: int, category: Optional[str] = None, db: Session = Depends(get_db)):
@@ -41,22 +55,12 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
     # Apply User's Personal Restrictions ALWAYS (regardless of category)
     user_restrictions = (user.restrictions or "").lower()
     if "vegetariano" in user_restrictions or "vegano" in user_restrictions:
-        query = query.filter(
-            ~Dish.ingredients.ilike("%carne%") & 
-            ~Dish.ingredients.ilike("%pollo%") & 
-            ~Dish.ingredients.ilike("%cerdo%") & 
-            ~Dish.ingredients.ilike("%res%") &
-            ~Dish.ingredients.ilike("%pescado%") &
-            ~Dish.ingredients.ilike("%gallina%") &
-            ~Dish.ingredients.ilike("%chicharr%") &
-            ~Dish.ingredients.ilike("%longaniza%") &
-            ~Dish.ingredients.ilike("%tocino%")
-        )
+        query = _apply_no_meat_filter(query)
     if "gluten" in user_restrictions or "celiaco" in user_restrictions:
         query = query.filter(
             ~Dish.ingredients.ilike("%trigo%") & 
             ~Dish.ingredients.ilike("%harina%") & 
-            ~Dish.ingredients.ilike("%pan%") &
+            ~Dish.ingredients.ilike("%pan,%") &
             ~Dish.ingredients.ilike("%pasta%")
         )
     
@@ -64,24 +68,17 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
     if category:
         if category == "Regionales":
             query = query.filter(Dish.is_regional == True)
-        elif category == "Sin Carne": # Vegetariano
-            # Filter out dishes with meat keywords in ingredients or description
-            # This is a basic implementation. In production, use a tag system.
-            query = query.filter(
-                (Dish.name.ilike("%vegetariano%")) | 
-                (Dish.description.ilike("%vegetariano%")) |
-                (~Dish.ingredients.ilike("%carne%") & ~Dish.ingredients.ilike("%pollo%") & ~Dish.ingredients.ilike("%cerdo%") & ~Dish.ingredients.ilike("%pescado%"))
-            )
-        elif category == "Sin Gluten": # Sin Harina/Trigo
+        elif category == "Sin Carne":
+            query = _apply_no_meat_filter(query)
+        elif category == "Sin Gluten":
             query = query.filter(
                 ~Dish.ingredients.ilike("%trigo%") & 
                 ~Dish.ingredients.ilike("%harina%") & 
-                ~Dish.ingredients.ilike("%pan%") &
+                ~Dish.ingredients.ilike("%pan,%") &
                 ~Dish.ingredients.ilike("%pasta%")
             )
         elif category == "Económico":
             query = query.filter(Dish.price <= 20000)
-        # 'Recomendado' is default (no filter)
         elif category == "Pet Friendly":
              query = query.filter(Restaurant.is_pet_friendly == True)
 
@@ -149,11 +146,15 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
             'gasto_total': dish.price or 20000, # Proxy
             'tiempo_permanencia': 60.0,
             'satisfaccion_servicio': 5,
-            'satisfaccion_comida': 5
+            'satisfaccion_comida': 5,
+            # Interaction features (must match training pipeline)
+            'interes_regional_match': user_regional_score * (1.0 if dish.is_regional else 0.0),
+            'price_budget_ratio': (dish.price or 20000) / max(user.budget or 100000, 1),
         }
         prediction_data.append(row)
         
     # 3. Predict
+    model = get_model()
     if model:
         try:
             df_predict = pd.DataFrame(prediction_data)

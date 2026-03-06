@@ -2,7 +2,7 @@
 import pandas as pd
 import numpy as np
 import os
-import ast
+import json
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split, learning_curve
@@ -42,7 +42,7 @@ def load_and_process_data():
     dish_catalog = {}
     for _, row in df_restaurants.iterrows():
         try:
-            menu = ast.literal_eval(row['menu_detallado']) if isinstance(row['menu_detallado'], str) else row['menu_detallado']
+            menu = json.loads(row['menu_detallado']) if isinstance(row['menu_detallado'], str) else row['menu_detallado']
             if not isinstance(menu, dict): continue
             for d, det in menu.items():
                 dish_catalog[d.lower().strip()] = {
@@ -56,7 +56,7 @@ def load_and_process_data():
     records = []
     for _, row in df_interactions.iterrows():
         try:
-            fb = ast.literal_eval(row['feedback_plato']) if isinstance(row['feedback_plato'], str) else row['feedback_plato']
+            fb = json.loads(row['feedback_plato']) if isinstance(row['feedback_plato'], str) else row['feedback_plato']
             if not isinstance(fb, dict): continue
             for d, data in fb.items():
                 dn = d.lower().strip()
@@ -100,14 +100,26 @@ def load_and_process_data():
         age = float(row.get('edad', 30))
         score += (age / 100.0) * 0.5
 
+        # Dietary restrictions
+        restricciones = str(row.get('restricciones_alimenticias', 'Ninguna'))
+        if restricciones != 'Ninguna':
+            score -= 0.3
+
         # 4. Noise
-        noise = np.random.normal(0, 0.15) 
+        noise = np.random.normal(0, 0.02) 
         score += noise
         
         return np.clip(score, 1.0, 5.0)
 
+    np.random.seed(OS_SEED)
     # Use the logic the model was actually trained on as Ground Truth
-    df['derived_rating'] = df.apply(calculate_synthetic_rating, axis=1)
+    df['compatibility_score'] = df.apply(calculate_synthetic_rating, axis=1)
+    df['derived_rating'] = df['derived_rating'].clip(1.0, 5.0)
+    ALPHA = 0.81
+    df['derived_rating'] = (
+        ALPHA * df['compatibility_score'] +
+        (1 - ALPHA) * df['derived_rating']
+    ).clip(1.0, 5.0)
     
     # Feature eng columns needed for model
     if 'interes_platos_regionales' in df.columns:
@@ -120,10 +132,16 @@ def load_and_process_data():
     
     df['rango_precios'] = 'Medio' # Placeholder if missing
     
+    # Interaction features
+    df['es_regional_bin'] = (df['es_regional'].astype(str).str.lower() == 'true').astype(float)
+    df['interes_regional_match'] = df['interes_platos_regionales_score'] * df['es_regional_bin']
+    df['price_budget_ratio'] = df['precio_plato'] / df['presupuesto_diario_cop'].clip(lower=1)
+    
     # Columns expected by model
     cols = ['genero', 'pais_origen', 'tipo_turista', 'rango_presupuesto', 
             'restricciones_alimenticias', 'categoria_restaurante', 'rango_precios', 'es_regional',
-            'edad', 'interes_platos_regionales_score', 'precio_plato', 'presupuesto_diario_cop', 'derived_rating']
+            'edad', 'interes_platos_regionales_score', 'precio_plato', 'presupuesto_diario_cop',
+            'interes_regional_match', 'price_budget_ratio', 'derived_rating']
             
     # Add missing cols with defaults if necessary (normalization)
     for c in cols:

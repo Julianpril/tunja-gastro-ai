@@ -1,24 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import pandas as pd
-import joblib
-import os
+
+from backend.services.ml_model import get_model
 
 router = APIRouter()
-
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "modelo_hibrido_v1.pkl")
-model = None
-
-def load_model():
-    global model
-    try:
-        if os.path.exists(MODEL_PATH):
-            model = joblib.load(MODEL_PATH)
-            print("Model loaded successfully")
-        else:
-            print(f"Model not found at {MODEL_PATH}")
-    except Exception as e:
-        print(f"Error loading model: {e}")
 
 class PredictionInput(BaseModel):
     genero: str
@@ -40,14 +26,11 @@ class PredictionInput(BaseModel):
     satisfaccion_servicio: int
     satisfaccion_comida: int
 
-@router.on_event("startup")
-async def startup_event():
-    load_model()
-
 @router.post("/predict")
 def predict(input_data: PredictionInput):
+    model = get_model()
     if model is None:
-        raise HTTPException(status_code=500, detail="Model not loaded")
+        raise HTTPException(status_code=503, detail="Model not loaded")
     
     data_dict = input_data.dict()
     # Convert boolean string to boolean if necessary, though pydantic handles types.

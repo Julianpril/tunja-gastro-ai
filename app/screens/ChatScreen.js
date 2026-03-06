@@ -1,13 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, shadow } from '../utils/colors';
-import { getChatResponse } from '../services/api';
+import { getChatResponse, getChatHistory, clearChatHistory } from '../services/api';
 
-const MOCK_CHAT_HISTORY = [
-    { id: '1', text: '¡Hola! Soy tu asistente gastronómico de Tunja. 🧑‍🍳 ¿En qué puedo ayudarte hoy?', sender: 'bot' },
-];
+const GREETING = { id: '1', text: '¡Hola! Soy tu asistente gastronómico de Tunja. 🧑‍🍳 ¿En qué puedo ayudarte hoy?', sender: 'bot' };
 
 const QUICK_SUGGESTIONS = [
     { id: 's1', icon: 'restaurant', text: '¿Dónde almorzar?', query: '¿Dónde me recomiendas almorzar hoy? Quiero algo tradicional' },
@@ -17,11 +15,43 @@ const QUICK_SUGGESTIONS = [
 ];
 
 export default function ChatScreen() {
-    const [messages, setMessages] = useState(MOCK_CHAT_HISTORY);
+    const [messages, setMessages] = useState([GREETING]);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(true);
     const flatListRef = useRef(null);
+
+    useEffect(() => {
+        loadHistory();
+    }, []);
+
+    const loadHistory = async () => {
+        try {
+            const history = await getChatHistory();
+            if (history && history.length > 0) {
+                const mapped = history.map(m => ({
+                    id: String(m.id),
+                    text: m.message,
+                    sender: m.is_user ? 'user' : 'bot'
+                }));
+                setMessages([GREETING, ...mapped]);
+                setShowSuggestions(false);
+            }
+        } catch (e) {
+            console.log('Failed to load chat history', e);
+        }
+    };
+
+    const handleClearHistory = () => {
+        Alert.alert('Borrar historial', '¿Deseas borrar todo el historial de chat?', [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Borrar', style: 'destructive', onPress: async () => {
+                await clearChatHistory();
+                setMessages([GREETING]);
+                setShowSuggestions(true);
+            }}
+        ]);
+    };
 
     const sendMessage = async (messageText = null) => {
         const textToSend = (typeof messageText === 'string' ? messageText : null) || inputText;
@@ -126,8 +156,13 @@ export default function ChatScreen() {
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
-                <Text style={styles.title}>Asistente Tunja AI</Text>
-                <Text style={styles.subtitle}>Pregunta sobre historia, platos y más</Text>
+                <View>
+                    <Text style={styles.title}>Asistente Tunja AI</Text>
+                    <Text style={styles.subtitle}>Pregunta sobre historia, platos y más</Text>
+                </View>
+                <TouchableOpacity onPress={handleClearHistory} style={{ padding: 8 }}>
+                    <Ionicons name="trash-outline" size={20} color={colors.text.light} />
+                </TouchableOpacity>
             </View>
 
             <FlatList
@@ -199,6 +234,9 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
         backgroundColor: colors.surface,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     title: {
         fontSize: 20,

@@ -1,39 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 import openai
-import pandas as pd
-import os
 import json
+import logging
+
 from backend.db.session import get_db
 from backend.models import User
+from backend.core.config import OPENAI_API_KEY
+from backend.services.data_loader import get_context_summary
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Reuse the API Key from chat.py or config
-# Ideally this should be in an env var, but for now we use the one provided in context
-API_KEY = "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"
-
-# Load Data (Same as chat.py)
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "ml", "data", "restaurantes_web_enriquecido_v2.csv")
-context_summary = ""
-
-def load_data():
-    global context_summary
-    try:
-        if os.path.exists(DATA_PATH):
-            df = pd.read_csv(DATA_PATH)
-            # Select relevant columns
-            summary_df = df[['nombre', 'tipo_negocio', 'especialidad', 'calificacion_promedio', 'rango_precio', 'menu_destacado', 'lat', 'lon']].fillna('')
-            context_summary = summary_df.to_string(index=False)
-    except Exception as e:
-        print(f"Error loading data for itinerary: {e}")
-
-load_data()
-
 class ItineraryRequest(BaseModel):
-    days: int = 1
+    days: int = Field(default=1, ge=1, le=7)
 
 @router.post("/generate/{user_id}")
 async def generate_itinerary(user_id: int, request: ItineraryRequest, db: Session = Depends(get_db)):
@@ -51,58 +34,56 @@ async def generate_itinerary(user_id: int, request: ItineraryRequest, db: Sessio
     - Acompañantes: {user.group_size or 1} personas
     """
 
-    # Build prompt without f-string for JSON example to avoid escaping issues
-    json_example = '''
-    {
-      "itinerary": [
-        {
-          "day": 1,
-          "activities": [
-            {
-              "time": "09:00 AM",
-              "type": "Desayuno",
-              "title": "Nombre del Lugar o Plato",
-              "description": "Breve descripción de por qué es buena opción",
-              "image_search": "colombian breakfast arepa coffee"
-            }
-          ]
-        }
-      ]
-    }
-    '''
-    
-    prompt = f"""
-    Actúa como un experto guía turístico y gastronómico de Tunja.
-    Genera un itinerario detallado de {request.days} día(s) para este turista.
-    
-    {user_profile}
-
-    Usa EXCLUSIVAMENTE la siguiente base de datos de restaurantes para las recomendaciones de comida:
-    {context_summary[:50000]} 
-
-    INSTRUCCIONES PARA IMÁGENES:
-    - NO uses "image", usa "image_search" con términos de búsqueda en inglés para Unsplash
-    - Los términos deben describir el plato o lugar específico (ej: "colombian soup wheat pork" para cuchuco)
-    - Usa 3-5 palabras clave relevantes en inglés
-    
-    Formato de Respuesta (JSON estricto):
-    {json_example}
-    
-    Asegúrate de que el JSON sea válido. No incluyas texto fuera del JSON.
-    """
-
     try:
         print(f"Generating itinerary for user {user_id}")
         print(f"User profile: Budget={user.budget}, Interest={user.regional_interest}")
         
+        context_summary = get_context_summary()
         if not context_summary:
-            print("WARNING: context_summary is empty! Attempting to reload...")
-            load_data()
-            if not context_summary:
-                print("ERROR: Failed to load context_summary.")
-                raise HTTPException(status_code=500, detail="Server configuration error: Data not loaded")
+            logger.error("Context summary is empty — CSV data not loaded")
+            raise HTTPException(status_code=500, detail="Server configuration error: Data not loaded")
 
-        client = openai.OpenAI(api_key=API_KEY)
+        # Build prompt without f-string for JSON example to avoid escaping issues
+        json_example = '''
+        {
+          "itinerary": [
+            {
+              "day": 1,
+              "activities": [
+                {
+                  "time": "09:00 AM",
+                  "type": "Desayuno",
+                  "title": "Nombre del Lugar o Plato",
+                  "description": "Breve descripción de por qué es buena opción",
+                  "image_search": "colombian breakfast arepa coffee"
+                }
+              ]
+            }
+          ]
+        }
+        '''
+
+        prompt = f"""
+        Actúa como un experto guía turístico y gastronómico de Tunja.
+        Genera un itinerario detallado de {request.days} día(s) para este turista.
+
+        {user_profile}
+
+        Usa EXCLUSIVAMENTE la siguiente base de datos de restaurantes para las recomendaciones de comida:
+        {context_summary[:50000]}
+
+        INSTRUCCIONES PARA IMÁGENES:
+        - NO uses "image", usa "image_search" con términos de búsqueda en inglés para Unsplash
+        - Los términos deben describir el plato o lugar específico (ej: "colombian soup wheat pork" para cuchuco)
+        - Usa 3-5 palabras clave relevantes en inglés
+
+        Formato de Respuesta (JSON estricto):
+        {json_example}
+
+        Asegúrate de que el JSON sea válido. No incluyas texto fuera del JSON.
+        """
+
+        client = openai.OpenAI(api_key=OPENAI_API_KEY)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -192,7 +173,5 @@ async def generate_itinerary(user_id: int, request: ItineraryRequest, db: Sessio
         return fix_itinerary_images(itinerary_json) if isinstance(itinerary_json, list) else itinerary_json
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"Error generating itinerary: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        logger.exception("Error generating itinerary for user %s", user_id)
+        raise HTTPException(status_code=500, detail="Error al generar el itinerario. Intenta de nuevo.")

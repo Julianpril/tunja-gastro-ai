@@ -2,6 +2,7 @@
 .DS_Store
 Thumbs.db
 *.log
+ml_output*.txt
 
 # IDEs
 .vscode/
@@ -32,8 +33,10 @@ build/
 *.h5
 *.pt
 *.pth
+*.pkl
 ml/data/
 ml/models/
+backend/models/*.pkl
 
 # Node / config
 node_modules/
@@ -42,6 +45,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .npm/
+package-lock.json
 
 # React Native
 # Expo
@@ -64,3 +68,12 @@ ios/*.xcodeproj/xcuserdata
 
 # Web
 app/web-build/
+
+# Database
+*.db
+*.sqlite3
+postgres_data/
+
+# Docs & generated outputs
+docs/
+*results_viz*

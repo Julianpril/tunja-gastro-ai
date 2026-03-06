@@ -3,8 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from backend.db.session import get_db
 from backend.models.user import User
+from pydantic import BaseModel
 from backend.schemas import UserCreate, UserLogin, UserResponse, Token
 from backend.core.security import verify_password, get_password_hash, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+import secrets
 
 router = APIRouter()
 
@@ -28,6 +30,30 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     return new_user
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    temp_password: str = None
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.email == request.email).first()
+    if not db_user:
+        # Don't reveal whether user exists
+        return {"message": "Si el correo está registrado, recibirás instrucciones para restablecer tu contraseña."}
+    
+    # Generate temporary password
+    temp_password = secrets.token_urlsafe(8)
+    db_user.hashed_password = get_password_hash(temp_password)
+    db.commit()
+    
+    return {
+        "message": "Se ha generado una contraseña temporal. Úsala para iniciar sesión y luego cámbiala.",
+        "temp_password": temp_password
+    }
 
 @router.post("/login", response_model=Token)
 def login(user: UserLogin, db: Session = Depends(get_db)):

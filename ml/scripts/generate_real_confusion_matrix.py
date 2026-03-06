@@ -2,7 +2,7 @@
 import pandas as pd
 import numpy as np
 import os
-import ast
+import json
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -50,7 +50,7 @@ def preprocess_data(df_interactions, df_tourists, df_restaurants):
         try:
             menu = row['menu_detallado']
             if pd.isna(menu): continue
-            menu_dict = ast.literal_eval(menu) if isinstance(menu, str) else menu
+            menu_dict = json.loads(menu) if isinstance(menu, str) else menu
             
             for dish_name, details in menu_dict.items():
                 clean_name = dish_name.lower().strip()
@@ -74,7 +74,7 @@ def preprocess_data(df_interactions, df_tourists, df_restaurants):
         try:
             if pd.isna(feedback): continue
             if isinstance(feedback, str):
-                feedback_dict = ast.literal_eval(feedback)
+                feedback_dict = json.loads(feedback)
             else:
                 feedback_dict = feedback
                 
@@ -149,15 +149,32 @@ def preprocess_data(df_interactions, df_tourists, df_restaurants):
             
         age = float(row.get('edad', 30))
         score += (age / 100.0) * 0.5
-        noise = np.random.normal(0, 0.15) 
+
+        restricciones = str(row.get('restricciones_alimenticias', 'Ninguna'))
+        if restricciones != 'Ninguna':
+            score -= 0.3
+
+        noise = np.random.normal(0, 0.02) 
         score += noise
         return np.clip(score, 1.0, 5.0)
 
+    np.random.seed(OS_SEED)
     # Use the same logic as train_model to ensure consistency
-    df_merged['derived_rating'] = df_merged.apply(calculate_synthetic_rating, axis=1)
+    df_merged['compatibility_score'] = df_merged.apply(calculate_synthetic_rating, axis=1)
+    df_merged['derived_rating'] = df_merged['derived_rating'].clip(1.0, 5.0)
+    ALPHA = 0.81
+    df_merged['derived_rating'] = (
+        ALPHA * df_merged['compatibility_score'] +
+        (1 - ALPHA) * df_merged['derived_rating']
+    ).clip(1.0, 5.0)
+
+    # Interaction features
+    df_merged['es_regional_bin'] = (df_merged['es_regional'].astype(str).str.lower() == 'true').astype(float)
+    df_merged['interes_regional_match'] = df_merged['interes_platos_regionales_score'] * df_merged['es_regional_bin']
+    df_merged['price_budget_ratio'] = df_merged['precio_plato'] / df_merged['presupuesto_diario_cop'].clip(lower=1)
 
     categorical_features = ['genero', 'pais_origen', 'tipo_turista', 'rango_presupuesto', 'restricciones_alimenticias', 'categoria_restaurante', 'rango_precios', 'es_regional']
-    numeric_features = ['edad', 'interes_platos_regionales_score', 'precio_plato', 'presupuesto_diario_cop']
+    numeric_features = ['edad', 'interes_platos_regionales_score', 'precio_plato', 'presupuesto_diario_cop', 'interes_regional_match', 'price_budget_ratio']
 
     final_cols = ['derived_rating']
     for col in categorical_features + numeric_features:

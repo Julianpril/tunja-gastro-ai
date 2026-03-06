@@ -74,7 +74,7 @@ export default function ItineraryScreen() {
                     
                     <View style={[styles.card, shadow.medium]}>
                         <Image 
-                            source={{ uri: (typeof image === 'string' ? image : null) || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80' }} 
+                            source={{ uri: (typeof image === 'string' && !image.includes('via.placeholder.com') ? image : null) || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80' }} 
                             style={styles.cardImage} 
                             resizeMode="cover"
                         />

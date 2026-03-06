@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, Switch, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, shadow } from '../utils/colors';
-import { getUserProfile, logout } from '../services/api';
+import { getUserProfile, updateUserProfile, logout } from '../services/api';
+import { clearCacheByPrefix } from '../services/offlineCache';
 
 export default function ProfileScreen({ navigation }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [savingPrefs, setSavingPrefs] = useState(false);
+    const [editModalVisible, setEditModalVisible] = useState(false);
+    const [editForm, setEditForm] = useState({ name: '', age: '', country: '', visit_motive: '' });
     const [preferences, setPreferences] = useState({
         vegetarian: false,
         vegan: false,
@@ -58,7 +62,59 @@ export default function ProfileScreen({ navigation }) {
         }
     };
 
-    const toggleSwitch = (key) => setPreferences(p => ({ ...p, [key]: !p[key] }));
+    const toggleSwitch = async (key) => {
+        const newPrefs = { ...preferences, [key]: !preferences[key] };
+        setPreferences(newPrefs);
+        
+        // Build restrictions string from preferences
+        const restrictions = [];
+        if (key === 'vegetarian' ? !preferences.vegetarian : newPrefs.vegetarian) restrictions.push('Vegetariano');
+        if (key === 'vegan' ? !preferences.vegan : newPrefs.vegan) restrictions.push('Vegano');
+        if (key === 'petFriendly' ? !preferences.petFriendly : newPrefs.petFriendly) restrictions.push('Pet Friendly');
+        
+        const newBudget = key === 'budget' ? !preferences.budget : newPrefs.budget;
+        
+        setSavingPrefs(true);
+        try {
+            await updateUserProfile({
+                restrictions: restrictions.join(', ') || 'Ninguna',
+                budget: newBudget ? 40000 : (user?.budget > 50000 ? user.budget : 100000),
+            });
+            // Invalidate recommendations cache so HomeScreen reloads with new preferences
+            await clearCacheByPrefix('recommendations');
+        } catch (error) {
+            // Revert on error
+            setPreferences(preferences);
+            Alert.alert('Error', 'No se pudieron guardar las preferencias');
+        } finally {
+            setSavingPrefs(false);
+        }
+    };
+
+    const openEditModal = () => {
+        setEditForm({
+            name: user?.name || '',
+            age: user?.age ? String(user.age) : '',
+            country: user?.country || '',
+            visit_motive: user?.visit_motive || '',
+        });
+        setEditModalVisible(true);
+    };
+
+    const saveProfile = async () => {
+        try {
+            const updateData = {
+                ...editForm,
+                age: editForm.age ? parseInt(editForm.age) : undefined,
+            };
+            const updated = await updateUserProfile(updateData);
+            setUser(prev => ({ ...prev, ...updated }));
+            setEditModalVisible(false);
+            Alert.alert('¡Listo!', 'Perfil actualizado correctamente');
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo actualizar el perfil');
+        }
+    };
 
     const HistoryItem = ({ name, date, rating }) => (
         <View style={styles.historyItem}>
@@ -86,6 +142,9 @@ export default function ProfileScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
             <ScrollView contentContainerStyle={styles.scrollContent}>
 
                 {/* Header Profile */}
@@ -96,10 +155,70 @@ export default function ProfileScreen({ navigation }) {
                     />
                     <Text style={styles.name}>{user?.name || 'Usuario'}</Text>
                     <Text style={styles.email}>{user?.email || 'correo@ejemplo.com'}</Text>
-                    <TouchableOpacity style={styles.editBtn}>
+                    <TouchableOpacity style={styles.editBtn} onPress={openEditModal}>
                         <Text style={styles.editBtnText}>Editar Perfil</Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* Edit Profile Modal */}
+                <Modal
+                    visible={editModalVisible}
+                    animationType="slide"
+                    transparent={true}
+                    onRequestClose={() => setEditModalVisible(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={[styles.modalContent, shadow.medium]}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Editar Perfil</Text>
+                                <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                                    <Ionicons name="close" size={24} color={colors.text.primary} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.modalLabel}>Nombre</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={editForm.name}
+                                onChangeText={(t) => setEditForm(f => ({ ...f, name: t }))}
+                                placeholder="Tu nombre"
+                                placeholderTextColor={colors.text.light}
+                            />
+
+                            <Text style={styles.modalLabel}>Edad</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={editForm.age}
+                                onChangeText={(t) => setEditForm(f => ({ ...f, age: t }))}
+                                placeholder="Ej: 28"
+                                keyboardType="numeric"
+                                placeholderTextColor={colors.text.light}
+                            />
+
+                            <Text style={styles.modalLabel}>País</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={editForm.country}
+                                onChangeText={(t) => setEditForm(f => ({ ...f, country: t }))}
+                                placeholder="Ej: Colombia"
+                                placeholderTextColor={colors.text.light}
+                            />
+
+                            <Text style={styles.modalLabel}>Motivo de visita</Text>
+                            <TextInput
+                                style={styles.modalInput}
+                                value={editForm.visit_motive}
+                                onChangeText={(t) => setEditForm(f => ({ ...f, visit_motive: t }))}
+                                placeholder="Ej: Turismo, Negocios"
+                                placeholderTextColor={colors.text.light}
+                            />
+
+                            <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}>
+                                <Text style={styles.saveBtnText}>Guardar Cambios</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
 
                 {/* Preferences Section */}
                 <View style={styles.section}>
@@ -173,6 +292,12 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
+    },
+    backButton: {
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 4,
+        alignSelf: 'flex-start',
     },
     scrollContent: {
         padding: 24,
@@ -284,6 +409,57 @@ const styles = StyleSheet.create({
     },
     logoutText: {
         color: colors.error,
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    modalContent: {
+        backgroundColor: colors.surface,
+        borderRadius: 24,
+        padding: 24,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: colors.text.primary,
+    },
+    modalLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.text.secondary,
+        marginBottom: 6,
+        marginTop: 12,
+    },
+    modalInput: {
+        backgroundColor: colors.background,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: colors.text.primary,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    saveBtn: {
+        backgroundColor: colors.primary,
+        borderRadius: 16,
+        paddingVertical: 14,
+        alignItems: 'center',
+        marginTop: 24,
+    },
+    saveBtnText: {
+        color: '#FFF',
         fontWeight: 'bold',
         fontSize: 16,
     },

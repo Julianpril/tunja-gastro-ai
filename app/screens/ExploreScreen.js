@@ -1,16 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Dimensions, Platform } from 'react-native';
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Dimensions, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_DEFAULT } from '../components/MapView';
 import * as Location from 'expo-location';
 import { colors, shadow } from '../utils/colors';
-import { getRecommendations } from '../services/api';
+import { getRecommendations, searchDishes, getFilteredDishes } from '../services/api';
+
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=800&auto=format&fit=crop';
 
 const { width, height } = Dimensions.get('window');
 
+const CUISINE_FILTERS = [
+    { key: 'all', label: 'Todos' },
+    { key: 'regional', label: 'Regionales' },
+    { key: 'economico', label: 'Económico' },
+    { key: 'top_rated', label: '⭐ 4+' },
+    { key: 'colombiana', label: 'Colombiana' },
+    { key: 'internacional', label: 'Internacional' },
+];
+
 export const ExploreScreen = ({ navigation, route }) => {
     const [query, setQuery] = useState('');
+    const [activeFilter, setActiveFilter] = useState('all');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
@@ -33,7 +45,7 @@ export const ExploreScreen = ({ navigation, route }) => {
 
     useEffect(() => {
         // Load initial data
-        searchFood('');
+        applySearch(query, activeFilter);
         // Get Location
         (async () => {
             let { status } = await Location.requestForegroundPermissionsAsync();
@@ -53,30 +65,42 @@ export const ExploreScreen = ({ navigation, route }) => {
         })();
     }, []);
 
-    const searchFood = async (text) => {
-        setQuery(text);
+    useEffect(() => {
+        applySearch(query, activeFilter);
+    }, [activeFilter]);
+
+    const applySearch = async (text, filter) => {
         setLoading(true);
         try {
-            const data = await getRecommendations();
-            
-            // Map data to ensure flat structure for UI but keep restaurant data
+            let data;
+            const filters = {};
+            if (text.trim()) filters.search = text;
+            if (filter === 'regional') filters.is_regional = true;
+            if (filter === 'economico') filters.price_max = 20000;
+            if (filter === 'top_rated') filters.min_rating = 4.0;
+            if (filter === 'colombiana') filters.cuisine_type = 'Colombiana';
+            if (filter === 'internacional') filters.cuisine_type = 'Internacional';
+
+            const hasFilters = Object.keys(filters).length > 0;
+            data = hasFilters ? await getFilteredDishes(filters) : await getRecommendations();
+
             const mappedData = data.map(item => ({
                 ...item,
-                image: item.image_url || item.image, 
+                image: item.image_url || item.image,
                 restaurantName: item.restaurant?.name || "Restaurante Local",
-                restaurantData: item.restaurant // Keep full object for coordinates
+                restaurantData: item.restaurant
             }));
-
-            const filtered = mappedData.filter(d => 
-                d.name.toLowerCase().includes(text.toLowerCase()) || 
-                d.restaurantName.toLowerCase().includes(text.toLowerCase())
-            );
-            setResults(filtered);
+            setResults(mappedData);
         } catch (err) {
             console.log(err);
         } finally {
             setLoading(false);
         }
+    };
+
+    const searchFood = (text) => {
+        setQuery(text);
+        applySearch(text, activeFilter);
     };
 
     // Extract unique restaurants for Map Markers
@@ -104,7 +128,7 @@ export const ExploreScreen = ({ navigation, route }) => {
             activeOpacity={0.8}
             onPress={() => navigation.navigate('DishDetail', { dish: item })}
         >
-            <Image source={{ uri: item.image }} style={styles.cardImage} />
+            <Image source={{ uri: (item.image && !item.image.includes('via.placeholder.com')) ? item.image : FALLBACK_IMAGE }} style={styles.cardImage} />
             <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <Text style={styles.cardSubtitle}>{item.restaurantName}</Text>
@@ -151,6 +175,20 @@ export const ExploreScreen = ({ navigation, route }) => {
                     </TouchableOpacity>
                 )}
             </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={{ paddingHorizontal: 24, gap: 8 }}>
+                {CUISINE_FILTERS.map(f => (
+                    <TouchableOpacity
+                        key={f.key}
+                        style={[styles.filterChip, activeFilter === f.key && styles.filterChipActive]}
+                        onPress={() => setActiveFilter(f.key)}
+                    >
+                        <Text style={[styles.filterChipText, activeFilter === f.key && styles.filterChipTextActive]}>
+                            {f.label}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
 
             {loading ? (
                 <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
@@ -314,5 +352,29 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         borderWidth: 2,
         borderColor: '#FFF',
-    }
+    },
+    filterRow: {
+        marginBottom: 12,
+        maxHeight: 44,
+    },
+    filterChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    filterChipActive: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+    },
+    filterChipText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.text.secondary,
+    },
+    filterChipTextActive: {
+        color: '#FFF',
+    },
 });

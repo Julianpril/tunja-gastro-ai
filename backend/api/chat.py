@@ -1,60 +1,59 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 import openai
-import pandas as pd
-import os
 from typing import List, Optional
-
 import logging
+from sqlalchemy.orm import Session
 
-# Configure logging
-logging.basicConfig(filename='chat_debug.log', level=logging.DEBUG)
+from backend.core.config import OPENAI_API_KEY
+from backend.services.data_loader import get_context_summary
+from backend.db.session import get_db
+from backend.models.chat import ChatMessage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# Configure OpenAI API Key
-API_KEY = "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"
-
-# Load Data
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "ml", "data", "restaurantes_web_enriquecido_v2.csv")
-restaurants_df = None
-context_summary = ""
-
-def load_data():
-    global restaurants_df, context_summary
-    try:
-        if os.path.exists(DATA_PATH):
-            restaurants_df = pd.read_csv(DATA_PATH)
-            
-            # Create a summary for the context
-            # We select relevant columns to keep the context size manageable
-            # Fill NaNs to avoid issues
-            summary_df = restaurants_df[['nombre', 'tipo_negocio', 'especialidad', 'calificacion_promedio', 'rango_precio', 'menu_destacado', 'direccion_web', 'lat', 'lon']].fillna('')
-            
-            # Convert to string format for the LLM
-            context_summary = summary_df.to_string(index=False)
-            logging.info(f"Chat data loaded successfully. Length: {len(context_summary)}")
-        else:
-            logging.error(f"Data not found at {DATA_PATH}")
-            context_summary = "No restaurant data available."
-    except Exception as e:
-        logging.error(f"Error loading chat data: {e}")
-        context_summary = "Error loading restaurant data."
-
-# Load data on module import
-load_data()
 
 class ChatRequest(BaseModel):
     message: str
     history: Optional[List[dict]] = []
+    user_id: Optional[int] = None
 
 class ChatResponse(BaseModel):
     response: str
 
+class ChatHistoryItem(BaseModel):
+    id: int
+    message: str
+    is_user: bool
+    timestamp: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+@router.get("/history/{user_id}", response_model=List[ChatHistoryItem])
+def get_chat_history(user_id: int, limit: int = Query(50, le=200), db: Session = Depends(get_db)):
+    msgs = db.query(ChatMessage).filter(
+        ChatMessage.user_id == user_id
+    ).order_by(ChatMessage.timestamp.asc()).limit(limit).all()
+    return [
+        ChatHistoryItem(
+            id=m.id, message=m.message, is_user=m.is_user,
+            timestamp=m.timestamp.isoformat() if m.timestamp else None
+        ) for m in msgs
+    ]
+
+@router.delete("/history/{user_id}")
+def clear_chat_history(user_id: int, db: Session = Depends(get_db)):
+    db.query(ChatMessage).filter(ChatMessage.user_id == user_id).delete()
+    db.commit()
+    return {"message": "Chat history cleared"}
+
 @router.post("/", response_model=ChatResponse)
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
     try:
-        logging.info(f"Received chat request: {request.message}")
+        logger.info("Received chat request: %s", request.message[:120])
+        context_summary = get_context_summary()
         
         # Construct messages for the LLM
         messages = [
@@ -62,7 +61,7 @@ async def chat_endpoint(request: ChatRequest):
             Eres un experto asistente gastronómico y turístico para la ciudad de Tunja, Boyacá.
             Tu única fuente de verdad es la siguiente base de datos de restaurantes:
             
-            {context_summary[:150000]} 
+            {context_summary[:80000]} 
             
             REGLAS ESTRICTAS:
             1. NO inventes información. Si un restaurante o plato no está en la lista, di que no tienes información sobre ello.
@@ -86,7 +85,7 @@ async def chat_endpoint(request: ChatRequest):
         messages.append({"role": "user", "content": request.message})
 
         # Call OpenAI API
-        client = openai.OpenAI(api_key=API_KEY)
+        client = openai.OpenAI(api_key=OPENAI_API_KEY)
         response = client.chat.completions.create(
             model="gpt-4o-mini", 
             messages=messages,
@@ -95,9 +94,21 @@ async def chat_endpoint(request: ChatRequest):
         )
         
         bot_reply = response.choices[0].message.content
-        logging.info("Got response from OpenAI")
+        logger.info("Got response from OpenAI")
+
+        # Persist messages to DB if user_id provided
+        if request.user_id:
+            try:
+                user_msg = ChatMessage(user_id=request.user_id, message=request.message, is_user=True)
+                bot_msg = ChatMessage(user_id=request.user_id, message=bot_reply, is_user=False)
+                db.add(user_msg)
+                db.add(bot_msg)
+                db.commit()
+            except Exception as pe:
+                logger.warning("Failed to persist chat: %s", pe)
+
         return {"response": bot_reply}
 
     except Exception as e:
-        logging.error(f"Error in chat endpoint: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error in chat endpoint: %s", e)
+        raise HTTPException(status_code=500, detail="Error al procesar tu mensaje. Intenta de nuevo.")

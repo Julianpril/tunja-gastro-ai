@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from backend.db.session import SessionLocal
 from backend.models import Restaurant, Dish
+from backend.update_images import _pick_dish_image, _pick_restaurant_image
 
 def clean_price(price_val):
     if pd.isna(price_val) or price_val is None:
@@ -53,7 +54,7 @@ def import_data():
                 latitude=row.get('lat', 0.0),
                 longitude=row.get('lon', 0.0),
                 rating=clean_rating(row.get('calificacion_promedio')),
-                image_url="https://via.placeholder.com/300", # Placeholder
+                image_url=_pick_restaurant_image(index),
                 price_range=row.get('rango_precio', '$$'),
                 cuisine_type=row.get('especialidad', 'Variada'),
                 is_pet_friendly=str(row.get('PetFriendly', 'no')).lower() in ['si', 'true', 'yes']
@@ -96,7 +97,7 @@ def import_data():
                         name=dish_name,
                         description=dish_info.get('descripcion', f"Delicioso plato de {dish_name}"),
                         price=clean_price(dish_info.get('precio')),
-                        image_url="https://via.placeholder.com/300",
+                        image_url=_pick_dish_image(dish_name, ingredients_str),
                         calories=int(dish_info.get('calorias', 0) or 0),
                         is_regional=bool(dish_info.get('origen_regional', False)),
                         ingredients=ingredients_str,

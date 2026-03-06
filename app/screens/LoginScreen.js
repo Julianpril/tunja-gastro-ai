@@ -9,12 +9,14 @@ import {
   KeyboardAvoidingView, 
   Platform, 
   Image,
-  Dimensions
+  Dimensions,
+  Alert,
+  Modal
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import Toast from 'react-native-toast-message';
-import { login } from '../services/api';
+import { login, forgotPassword } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -86,6 +88,37 @@ const LoginScreen = ({ navigation }) => {
     }
   };
 
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [showForgotModal, setShowForgotModal] = useState(false);
+
+  const handleForgotPassword = async (inputEmail) => {
+    if (!inputEmail) return;
+    try {
+      const res = await forgotPassword(inputEmail.trim());
+      Alert.alert(
+        'Contraseña Temporal',
+        `Tu nueva contraseña temporal es:\n\n${res.temp_password}\n\nÚsala para iniciar sesión y luego cámbiala.`
+      );
+    } catch {
+      Alert.alert('Error', 'No se encontró una cuenta con ese correo.');
+    }
+  };
+
+  const onForgotPress = () => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Recuperar Contraseña',
+        'Ingresa tu correo electrónico:',
+        (text) => handleForgotPassword(text),
+        'plain-text',
+        email
+      );
+    } else {
+      setForgotEmail(email);
+      setShowForgotModal(true);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -135,7 +168,7 @@ const LoginScreen = ({ navigation }) => {
                 onChangeText={setPassword}
                 secureTextEntry
               />
-              <TouchableOpacity style={styles.forgotPassword}>
+              <TouchableOpacity style={styles.forgotPassword} onPress={onForgotPress}>
                 <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
               </TouchableOpacity>
             </View>
@@ -184,6 +217,33 @@ const LoginScreen = ({ navigation }) => {
 
         </KeyboardAvoidingView>
       </ImageBackground>
+
+      {/* Android Forgot Password Modal */}
+      <Modal visible={showForgotModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Recuperar Contraseña</Text>
+            <Text style={styles.modalSubtitle}>Ingresa tu correo electrónico:</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="ejemplo@correo.com"
+              placeholderTextColor="#999"
+              value={forgotEmail}
+              onChangeText={setForgotEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity onPress={() => setShowForgotModal(false)} style={styles.modalCancelBtn}>
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setShowForgotModal(false); handleForgotPassword(forgotEmail); }} style={styles.modalSendBtn}>
+                <Text style={styles.modalSendText}>Enviar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -352,6 +412,63 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
     textDecorationLine: 'underline',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalBox: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#DDD',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
+    gap: 12,
+  },
+  modalCancelBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  modalCancelText: {
+    color: '#999',
+    fontSize: 16,
+  },
+  modalSendBtn: {
+    backgroundColor: '#FF6B6B',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  modalSendText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

@@ -7,9 +7,13 @@ import { colors, shadow } from '../utils/colors';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.6;
 
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=800&auto=format&fit=crop';
+
 export default function DishCard({ dish, onPress }) {
-    // Fallback image if url is missing
-    const imageSource = dish.image ? { uri: dish.image } : { uri: 'https://via.placeholder.com/300' };
+    // Fallback image if url is missing or still a placeholder
+    const raw = dish.image || dish.image_url;
+    const isPlaceholder = !raw || raw.includes('via.placeholder.com');
+    const imageSource = { uri: isPlaceholder ? FALLBACK_IMAGE : raw };
 
     return (
         <TouchableOpacity

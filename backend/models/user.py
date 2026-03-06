@@ -27,3 +27,4 @@ class User(Base):
     reviews = relationship("Review", back_populates="user")
     itineraries = relationship("Itinerary", back_populates="user")
     chat_messages = relationship("ChatMessage", back_populates="user")
+    favorites = relationship("Favorite", back_populates="user")

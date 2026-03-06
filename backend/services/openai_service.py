@@ -1,17 +1,15 @@
 import openai
 import os
 import json
+from backend.core.config import OPENAI_API_KEY
 
-# Configure API Key
-# Ideally this should be in an env var
-API_KEY = "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"
 
 def generate_dish_content(dish_name: str, ingredients: str):
     """
-    Generates cultural history and reviews for a dish using OpenAI (formerly Gemini).
+    Generates cultural history and reviews for a dish using OpenAI.
     """
     try:
-        client = openai.OpenAI(api_key=API_KEY)
+        client = openai.OpenAI(api_key=OPENAI_API_KEY)
         
         prompt = f"""
         Actúa como un experto gastrónomo de Tunja, Boyacá.

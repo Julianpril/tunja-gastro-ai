@@ -27,7 +27,7 @@ def seed_data():
         latitude=5.53528,
         longitude=-73.36778,
         rating=4.8,
-        image_url="https://via.placeholder.com/300",
+        image_url="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=800&auto=format&fit=crop",
         price_range="$$",
         cuisine_type="Tradicional"
     )
@@ -39,7 +39,7 @@ def seed_data():
         latitude=5.53200,
         longitude=-73.36000,
         rating=4.5,
-        image_url="https://via.placeholder.com/300",
+        image_url="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=800&auto=format&fit=crop",
         price_range="$$$",
         cuisine_type="Fusión"
     )
@@ -51,7 +51,7 @@ def seed_data():
         latitude=5.54000,
         longitude=-73.35000,
         rating=4.7,
-        image_url="https://via.placeholder.com/300",
+        image_url="https://images.unsplash.com/photo-1559339352-11d035aa65de?q=80&w=800&auto=format&fit=crop",
         price_range="$$",
         cuisine_type="Campestre"
     )
@@ -70,7 +70,7 @@ def seed_data():
         name="Cuchuco de Trigo con Espinazo",
         description="Sopa espesa de trigo con espinazo de cerdo, habas y papas.",
         price=25000.0,
-        image_url="https://via.placeholder.com/300",
+        image_url="https://images.unsplash.com/photo-1547592166-23acbe346499?q=80&w=800&auto=format&fit=crop",
         calories=600,
         is_regional=True,
         ingredients="Trigo, Espinazo de cerdo, Habas, Papa sabanera, Papa criolla",
@@ -83,7 +83,7 @@ def seed_data():
         name="Fritanga Boyacense",
         description="Picada con longaniza, morcilla, papa criolla y plátano maduro.",
         price=35000.0,
-        image_url="https://via.placeholder.com/300",
+        image_url="https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=800&auto=format&fit=crop",
         calories=850,
         is_regional=True,
         ingredients="Longaniza, Morcilla, Papa criolla, Plátano maduro, Arepa",
@@ -96,7 +96,7 @@ def seed_data():
         name="Cocido Boyacense",
         description="Guiso con cubios, ibias, chuguas y diferentes tipos de carne.",
         price=30000.0,
-        image_url="https://via.placeholder.com/300",
+        image_url="https://images.unsplash.com/photo-1512058564366-18510be2db19?q=80&w=800&auto=format&fit=crop",
         calories=500,
         is_regional=True,
         ingredients="Cubios, Ibias, Chuguas, Carne de res, Carne de cerdo, Pollo",

@@ -20,3 +20,4 @@ class Dish(Base):
     # Relationships
     restaurant = relationship("Restaurant", back_populates="dishes")
     reviews = relationship("Review", back_populates="dish")
+    favorites = relationship("Favorite", back_populates="dish")

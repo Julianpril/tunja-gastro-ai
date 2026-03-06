@@ -1,10 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.api import ml_routes, auth_routes, restaurants, dishes, recommendations, users, chat, itinerary
+from backend.api import ml_routes, auth_routes, restaurants, dishes, recommendations, users, chat, itinerary, favorites, reviews
 from backend.db.session import engine, Base
+from backend.update_images import update_images
 
 # Create tables
 Base.metadata.create_all(bind=engine)
+
+# Replace any remaining placeholder images with real ones
+try:
+    update_images()
+except Exception as e:
+    print(f"Warning: could not update placeholder images on startup: {e}")
 
 app = FastAPI()
 
@@ -25,6 +32,8 @@ app.include_router(recommendations.router, prefix="/api/recommendations", tags=[
 app.include_router(ml_routes.router, prefix="/api/ml", tags=["machine-learning"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(itinerary.router, prefix="/api/itinerary", tags=["itinerary"])
+app.include_router(favorites.router, prefix="/api/favorites", tags=["favorites"])
+app.include_router(reviews.router, prefix="/api/reviews", tags=["reviews"])
 
 @app.get("/")
 def read_root():

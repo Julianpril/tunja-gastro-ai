@@ -17,9 +17,8 @@ export default function ItineraryScreen() {
     const fetchItinerary = async () => {
         setLoading(true);
         try {
-            // Request 3 days of itinerary
             const data = await getItinerary(3);
-            // Ensure data is an array
+            // Normalizar respuesta para consumir siempre una colección
             const formattedData = Array.isArray(data) ? data : [data];
             setItineraryData(formattedData);
         } catch (error) {
@@ -44,7 +43,6 @@ export default function ItineraryScreen() {
     console.log("Current Day Activities:", JSON.stringify(currentDayActivities, null, 2));
 
     const ActivityCard = ({ time, title, type, image, description, isLast }) => {
-        // Helper to safely render text
         const renderText = (content) => {
             if (content === null || content === undefined) return "";
             if (typeof content === 'string') return content;
@@ -111,7 +109,7 @@ export default function ItineraryScreen() {
         );
     };
 
-    // Helper to color-code activities
+    // Paleta por tipo de actividad para la línea de tiempo
     const getTypeColor = (type) => {
         const t = type?.toLowerCase() || '';
         if (t.includes('desayuno')) return '#FF9800'; // Orange

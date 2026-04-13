@@ -94,7 +94,7 @@ export default function DishDetailScreen({ route, navigation }) {
         }
     };
 
-    // Helper to parse ingredients safely
+    // Normaliza ingredientes desde string, JSON serializado o lista
     const getIngredients = (ingData) => {
         if (!ingData) return ['Ingredientes tradicionales'];
         if (Array.isArray(ingData)) return ingData;

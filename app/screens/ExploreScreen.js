@@ -46,7 +46,7 @@ export const ExploreScreen = ({ navigation, route }) => {
     useEffect(() => {
         // Load initial data
         applySearch(query, activeFilter);
-        // Get Location
+        // Solicitar permisos y sincronizar mapa con la ubicación del usuario
         (async () => {
             let { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
@@ -103,16 +103,16 @@ export const ExploreScreen = ({ navigation, route }) => {
         applySearch(text, activeFilter);
     };
 
-    // Extract unique restaurants for Map Markers
+    // Consolidar restaurantes para evitar marcadores duplicados
     const getUniqueRestaurants = () => {
         const unique = {};
         results.forEach(item => {
             if (item.restaurantData && item.restaurantData.latitude && item.restaurantData.longitude) {
-                // Use restaurant name as key to deduplicate
+                // Se usa nombre como llave de deduplicación
                 if (!unique[item.restaurantName]) {
                     unique[item.restaurantName] = {
                         ...item.restaurantData,
-                        dishes: [item] // Keep track of dishes here if needed
+                        dishes: [item] // Mantener referencia de platos asociados
                     };
                 } else {
                     unique[item.restaurantName].dishes.push(item);

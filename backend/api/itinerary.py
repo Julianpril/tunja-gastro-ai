@@ -97,7 +97,7 @@ async def generate_itinerary(user_id: int, request: ItineraryRequest, db: Sessio
         content = response.choices[0].message.content
         print(f"OpenAI Response: {content[:100]}...") # Log first 100 chars
 
-        # Clean markdown if present
+        # Normalizar salida por si el proveedor devuelve bloques markdown
         if content.startswith("```json"):
             content = content.replace("```json", "").replace("```", "")
         elif content.startswith("```"):
@@ -110,11 +110,11 @@ async def generate_itinerary(user_id: int, request: ItineraryRequest, db: Sessio
             """Convert search terms to Unsplash Source URL (free, no API key needed)"""
             import urllib.parse
             
-            # Use provided search terms, or generate from activity/title
+            # Priorizar términos entregados por el modelo; si faltan, derivarlos por contexto
             if search_terms and isinstance(search_terms, str) and len(search_terms) > 2:
                 query = search_terms
             else:
-                # Fallback: generate terms from activity type and title
+                # Fallback determinístico a partir de tipo de actividad y título
                 activity_type = (activity_type or "").lower()
                 title_lower = (title or "").lower()
                 
@@ -136,12 +136,11 @@ async def generate_itinerary(user_id: int, request: ItineraryRequest, db: Sessio
                 else:
                     query = "colombian restaurant food traditional"
             
-            # Clean and encode the query
+            # Normalizar y codificar la query para URL
             query = query.strip().replace("  ", " ")
             encoded_query = urllib.parse.quote(query)
             
-            # Use Unsplash Source (redirects to a random matching image)
-            # Format: https://source.unsplash.com/800x600/?query
+            # Unsplash Source redirige a una imagen aleatoria según la búsqueda
             return f"https://source.unsplash.com/800x600/?{encoded_query}"
         
         def fix_itinerary_images(itinerary_data):

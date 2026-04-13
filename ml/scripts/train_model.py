@@ -260,7 +260,7 @@ def run_pipeline():
     print("-" * 30)
     print("Retraining best model on FULL dataset with Scikit-learn...")
     
-    # SPLIT DATA for Final Evaluation (Critical for validating 100% score)
+    # Separación holdout para validar generalización
     X = data.drop('derived_rating', axis=1)
     y = data['derived_rating']
     
@@ -273,7 +273,7 @@ def run_pipeline():
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=OS_SEED)
     print(f"Split: Train={len(X_train)}, Test={len(X_test)}")
 
-    # Prepare Pipeline Sklearn Puro
+    # Pipeline de preprocesamiento + estimador
     from sklearn.pipeline import Pipeline
     from sklearn.compose import ColumnTransformer
     from sklearn.impute import SimpleImputer
@@ -302,7 +302,7 @@ def run_pipeline():
     pipeline = Pipeline(steps=[('preprocessor', preprocessor),
                                ('regressor', final_estimator)])
 
-    # Fit on TRAIN only
+    # Entrenar exclusivamente con partición de entrenamiento
     print(f"Training on {len(X_train)} rows...")
     pipeline.fit(X_train, y_train)
     print("Training Complete.")
@@ -323,9 +323,6 @@ def run_pipeline():
     
     if r2 == 1.0:
         print("ALERT: R2 is still 1.0. Checking for column leakage...")
-        # Check correlations
-        # Encode cat features roughly just to check corr
-        # This is basic debugging
         pass
 
     # 6. Save Model (Retrain on Full Data for Production if metrics are good)

@@ -112,8 +112,7 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
     prediction_data = []
     
     for dish in all_dishes:
-        # Calculate restaurant stats
-        # In a real app, cache this or pre-calculate
+        # Calcular agregados del restaurante para cada plato
         restaurant_dishes = dish.restaurant.dishes
         regional_count = sum(1 for d in restaurant_dishes if d.is_regional)
         
@@ -128,7 +127,7 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
             'interes_platos_regionales_score': user_regional_score,
             'presupuesto_diario_cop': user.budget or 100000,
             
-            # Restaurant/Dish Features
+            # Variables del plato/restaurante
             'categoria_restaurante': dish.restaurant.cuisine_type or "Variada",
             'rango_precios': dish.restaurant.price_range or "$$",
             'es_regional': str(dish.is_regional),
@@ -136,7 +135,7 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
             'origen_regional': str(dish.is_regional), # Approximation
             'platos_regionales_count': regional_count,
             
-            # Context (Placeholders as we don't have real-time context yet)
+            # Contexto de sesión (valores estáticos por ausencia de señal en tiempo real)
             'zona': "Centro", 
             'tipo_negocio': "Restaurante",
             'motivo_visita': user.visit_motive or "Turismo",
@@ -147,7 +146,7 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
             'tiempo_permanencia': 60.0,
             'satisfaccion_servicio': 5,
             'satisfaccion_comida': 5,
-            # Interaction features (must match training pipeline)
+            # Features de interacción alineadas con el pipeline de entrenamiento
             'interes_regional_match': user_regional_score * (1.0 if dish.is_regional else 0.0),
             'price_budget_ratio': (dish.price or 20000) / max(user.budget or 100000, 1),
         }
@@ -182,7 +181,7 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
             # Sort by predicted score (descending)
             scored_dishes.sort(key=lambda x: x[1], reverse=True)
             
-            # DEDUPLICATION: Only show each dish name once (pick best-rated restaurant)
+            # Deduplicar por nombre de plato; conservar la opción con mejor score
             seen_dish_names = set()
             unique_dishes = []
             for dish, score in scored_dishes:
@@ -222,7 +221,7 @@ def get_recommendations(user_id: int, category: Optional[str] = None, db: Sessio
     
     scored_dishes.sort(key=lambda x: x[1], reverse=True)
     
-    # DEDUPLICATION: Only show each dish name once
+    # Deduplicar por nombre para evitar variantes repetidas
     seen_dish_names = set()
     unique_dishes = []
     for dish, score in scored_dishes:

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../utils/colors';
 
-// Web fallback for MapView - shows a placeholder
+// Implementación de respaldo para Web (sin mapa nativo interactivo)
 export const MapViewComponent = ({ style, region, children, ...props }) => {
     return (
         <View style={[styles.container, style]}>
@@ -23,9 +23,9 @@ export const MapViewComponent = ({ style, region, children, ...props }) => {
     );
 };
 
-// Marker component placeholder for web
+// En Web no se renderizan marcadores; se mantiene API compatible
 export const Marker = ({ coordinate, title, description, children }) => {
-    return null; // Markers are not rendered on web
+    return null; // Marcadores no soportados en este renderer
 };
 
 export const PROVIDER_DEFAULT = null;

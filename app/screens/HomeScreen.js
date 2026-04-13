@@ -30,7 +30,7 @@ export default function HomeScreen({ navigation }) {
     const loadUserData = async () => {
         try {
             const name = await AsyncStorage.getItem('userName');
-            if (name) setUserName(name.split(' ')[0]); // Get first name
+            if (name) setUserName(name.split(' ')[0]); // Mostrar primer nombre en saludo
         } catch (e) {
             console.log('Error loading user name', e);
         }
@@ -81,7 +81,7 @@ export default function HomeScreen({ navigation }) {
                     </TouchableOpacity>
                 </View>
 
-                {/* Search Bar Placeholder */}
+                {/* Atajo hacia búsqueda global */}
                 <TouchableOpacity style={styles.searchBar} activeOpacity={0.8} onPress={() => navigation.navigate('Explorar')}>
                     <Ionicons name="search" size={20} color={colors.text.secondary} />
                     <Text style={styles.placeholderText}>Buscar restaurantes, platos...</Text>
@@ -137,7 +137,7 @@ export default function HomeScreen({ navigation }) {
                     <Text style={styles.sectionTitle}>Cerca de ti</Text>
                     <TouchableOpacity style={[styles.mapContainer, shadow.small]} activeOpacity={0.9} onPress={() => navigation.navigate('Explorar', { viewMode: 'map' })}>
                         <Image
-                            source={{ uri: 'https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?auto=format&fit=crop&w=600&q=80' }} // Generic map placeholder
+                            source={{ uri: 'https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?auto=format&fit=crop&w=600&q=80' }} // Imagen de apoyo visual para el bloque de mapa
                             style={styles.mapImage}
                         />
                         <View style={styles.mapOverlay}>

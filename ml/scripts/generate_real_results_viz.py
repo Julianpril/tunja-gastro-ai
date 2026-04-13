@@ -126,11 +126,11 @@ def load_and_process_data():
         score_map = {'bajo': 1, 'medio': 3, 'alto': 5}
         df['interes_platos_regionales_score'] = df['interes_platos_regionales'].map(score_map).fillna(3)
         
-    df['rango_presupuesto'] = 'Medio' # Default/Simplified
+    df['rango_presupuesto'] = 'Medio' # Valor inicial cuando no hay presupuesto informado
     if 'presupuesto_diario_cop' in df.columns:
         df['rango_presupuesto'] = df['presupuesto_diario_cop'].apply(lambda x: 'Bajo' if float(x)<50000 else ('Alto' if float(x)>150000 else 'Medio'))
     
-    df['rango_precios'] = 'Medio' # Placeholder if missing
+    df['rango_precios'] = 'Medio' # Valor por defecto si no existe en la fuente
     
     # Interaction features
     df['es_regional_bin'] = (df['es_regional'].astype(str).str.lower() == 'true').astype(float)

@@ -250,7 +250,7 @@ export const getFilteredDishes = async (filters = {}) => {
     }
 };
 
-// Placeholder for future ML endpoints
+// Punto de entrada de recomendaciones (rule-based o ML según backend)
 export const getRecommendations = async (category = null) => {
     const cacheKey = `recommendations_${category || 'all'}`;
     return fetchWithCache(cacheKey, async () => {

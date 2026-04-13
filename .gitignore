@@ -77,3 +77,6 @@ postgres_data/
 # Docs & generated outputs
 docs/
 *results_viz*
+.claude/
+tmp_feature_importance.py
+tmp_features_list.txt

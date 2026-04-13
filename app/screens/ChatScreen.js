@@ -63,12 +63,10 @@ export default function ChatScreen() {
         setMessages(current => [...current, userMsg]);
         setInputText('');
         setIsTyping(true);
-        setShowSuggestions(false); // Hide suggestions after first message
+        setShowSuggestions(false); // Ocultar sugerencias al iniciar conversación
 
         try {
-            // Send the message and the history (excluding the one we just added locally for display, 
-            // or we can pass it if we want. The backend logic appends the current message anyway.
-            // So passing 'messages' (current state) is fine as history.
+            // El backend incorpora el mensaje actual, por lo que se envía el historial previo.
             const response = await getChatResponse(textToSend, messages);
             
             const botResponse = {
@@ -118,7 +116,7 @@ export default function ChatScreen() {
                         );
                     }
                     
-                    // Handle bold text: **text**
+                    // Parsear sintaxis markdown para negritas: **texto**
                     const boldParts = part.split(/(\*\*.*?\*\*)/g);
                     return (
                         <Text key={index} style={[styles.msgText, styles.botText, { marginBottom: 4 }]}>

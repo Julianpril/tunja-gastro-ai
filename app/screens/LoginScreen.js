@@ -125,7 +125,7 @@ const LoginScreen = ({ navigation }) => {
       
       {/* Background Image with Blur */}
       <ImageBackground
-        source={{ uri: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop' }} // Placeholder food image
+        source={{ uri: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1974&auto=format&fit=crop' }} // Imagen de contexto para el fondo de autenticación
         style={styles.backgroundImage}
         blurRadius={3} // Subtle blur
       >
